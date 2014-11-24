@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: ProjectContent.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Canvas
+        width="100%"
+        height="100%"
+        xmlns:mx="http://www.adobe.com/2006/mxml"
+        xmlns:ns="org.seamless_ip.ui.experimentdesigner.*"
+        xmlns:common="org.seamless_ip.ui.common.*"
+        xmlns:indicators="org.seamless_ip.ui.indicators.*"
+        xmlns:narratives="org.seamless_ip.ui.narratives.*"
+        xmlns:compositioneditor="org.seamless_ip.ui.compositioneditor.*"
+        xmlns:projects="org.seamless_ip.ui.projects.*"
+        xmlns:seampress="org.seamless_ip.ui.seampress.*"
+        xmlns:processingcenter="org.seamless_ip.ui.processingcenter.*"
+        xmlns:ns1="org.seamless_ip.ui.pica.*"
+        xmlns:ns2="org.seamless_ip.ui.help.*">
+
+    <!--
+    Main screen for viewing and editing project content.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.controls.Alert;
+        import mx.core.Container;
+
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        // active project
+        [Bindable]
+        private var _project:Project;
+        // active user
+        [Bindable]
+        private var _user:User = new User();
+
+
+        /**
+         * Sets the active project.
+         */
+        public function set project(project:Project):void {
+            _project = project;
+            if (contentViewStack != null)
+                taskList.switchToDefault();
+        }
+
+
+        /**
+         * Sets the active user.
+         */
+        public function set user(user:User):void {
+            _user = user;
+        }
+
+
+        /**
+         * Changes the displayed content screen according to the menu
+         * selection.
+         */
+        private function changeContent(): void {
+            switch (taskList.activeTask) {
+                case BulbMenuCanvas.TASK_PROJECT:
+                    switchContentView(projectDefinitionView);
+                    break;
+                case BulbMenuCanvas.TASK_NARRATIVE:
+                    switchContentView(narrativeExperimentsView);
+                    break;
+                case BulbMenuCanvas.TASK_INDICATOR:
+                    switchContentView(indicatorSelectionView);
+                    break;
+                case BulbMenuCanvas.TASK_INDICATOR:
+                    switchContentView(indicatorSelectionView);
+                    break;
+                case BulbMenuCanvas.TASK_MODELING_EXPERIMENT:
+                    if (_user.canDoForProject(_project.id, "READ", "EXPERIMENT") || _user.canDoForProject(_project.id, "UPDATE", "EXPERIMENT")) {
+                        switchContentView(experimentManager);
+                    } else {
+                        Alert.show("Permission denied");
+                    }
+                    break;
+                case BulbMenuCanvas.TASK_MODELING_QUEUEING:
+                    switchContentView(experimentsOverview);
+                    break;
+                case BulbMenuCanvas.TASK_MODELING_CHAIN:
+                    switchContentView(modelChainView);
+                    break;
+                case BulbMenuCanvas.TASK_MODELING_CALCULATION:
+                    switchContentView(procEnvConsole);
+                    break;
+                case BulbMenuCanvas.TASK_VISUALISATION:
+                    switchContentView(presentationView);
+                    break;
+                case BulbMenuCanvas.TASK_INSTITUTIONAL:
+                    switchContentView(institutionalAnalysisView);
+                    break;
+                case BulbMenuCanvas.TASK_BACKGROUND:
+                    switchContentView(infoMenu);
+                    break;
+            }
+        }
+
+
+        /**
+         * Performs the content screen switch in the GUI.
+         */
+        private function switchContentView(newView:Container):void {
+            contentViewStack.selectedChild = newView;
+        }
+            
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Effects
+         Used when changing views.
+     ===========================================================================
+     -->
+
+    <mx:Fade id="viewIn" duration="500"/>
+    <mx:Fade id="viewOut" duration="500"/>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml"
+             width="100%" height="100%"
+             horizontalAlign="center" verticalAlign="middle"
+             horizontalCenter="0" verticalCenter="0">
+
+        <common:BulbMenuCanvas id="taskList"
+                               height="100%"
+                               paddingLeft="0" paddingRight="0"
+                               paddingTop="0" paddingBottom="5"
+                               horizontalScrollPolicy="off"
+                               verticalScrollPolicy="off"
+                               borderStyle="none"
+                               dropShadowEnabled="false"
+                               borderColor="#c0c0c0"
+                               activeTaskChanged="changeContent()"
+                               project="{_project}"
+                               user="{_user}"/>
+
+        <mx:ViewStack id="contentViewStack"
+                      width="100%" height="100%"
+                      paddingLeft="5"
+                      paddingRight="5"
+                      paddingTop="5"
+                      paddingBottom="5"
+                      borderStyle="solid"
+                      cornerRadius="10"
+                      backgroundColor="#FFFFFF"
+                      backgroundAlpha="0.6"
+                      left="5"
+                      right="5"
+                      top="5"
+                      bottom="5"
+                >
+
+            <projects:ProjectDefinition id="projectDefinitionView"
+                                        label="Project Definition"
+                                        width="100%" height="100%"
+                                        project="{_project}"
+                    />
+
+            <narratives:NarrativeExperimentManagerTask id="narrativeExperimentsView"
+                                                       width="100%" height="100%"
+                                                       project="{_project}"
+                    />
+
+            <indicators:IndicatorFramework id="indicatorSelectionView"
+                                           label="Indicator Manager"
+                                           width="100%" height="100%"
+                                           show="{indicatorSelectionView.init(_user, _project)}"
+                    />
+
+            <ns:ExperimentDesigner id="experimentManager"
+                                   width="100%" height="100%"
+                                   project="{_project}"
+                                   user="{_user}"/>
+
+            <processingcenter:ExperimentsOverview id="experimentsOverview"
+                                                  width="100%" height="100%"
+                                                  label="Project Experiments"
+                                                  project="{_project}"
+                    />
+
+            <processingcenter:ProcessingCenter id="procEnvConsole"
+                                               width="100%" height="100%"
+                                               label="Processing Center"
+                                               project="{_project}"
+                    />
+
+            <compositioneditor:CompositionViewer id="modelChainView"
+                                                 label="Model Chains"
+                                                 width="100%" height="100%"
+                                                 show="{modelChainView.init(_project)}"
+                    />
+
+            <seampress:SeamPress id="presentationView"
+                                 label="Output Visualization"
+                                 width="100%" height="100%"
+                                 show="{presentationView.init(_user, _project)}"
+                    />
+
+            <ns1:Instutionalcompatibilities2 id="institutionalAnalysisView"
+                                             project="{_project}"
+                                             user="{_user}"
+                                             label="Institutional Analysis"
+                                             width="100%" height="100%"
+                    />
+
+            <ns2:TopicsIndex id="infoMenu"
+                             width="100%" height="100%"
+                             label="Background Information and Help Topics"
+                             show="{infoMenu.init()}"
+                    />
+
+        </mx:ViewStack>
+    </mx:HBox>
+</mx:Canvas>

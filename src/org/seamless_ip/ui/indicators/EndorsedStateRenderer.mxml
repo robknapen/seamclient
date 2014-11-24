@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: EndorsedStateRenderer.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+         width="100%"
+         height="100%"
+         horizontalAlign="center"
+         verticalAlign="middle"
+        >
+
+    <!--
+	This item renderer is for IIndicator instances and depicts the isEndorsed
+	and isImplemented properties of it with an icon.
+    -->
+    <mx:Script>
+	  	<![CDATA[
+        import org.seamless_ip.services.transferobjects.indi.IIndicator;
+
+        // flag if current object is an endorsed indicator
+        [Bindable]
+        private var _endorsed:Boolean = true;
+        // flag if current object is an implemented (operational) indicator
+        [Bindable]
+        private var _implemented:Boolean = true;
+
+
+        /**
+         * Overrides the setter for the data property to ensure that the
+         * selected property of the checkbox matches the value of the
+         * selected property of the represented object.
+         *
+         * @param value Object to set as data
+         */
+        override public function set data(value:Object):void {
+            if (value != null) {
+                super.data = value;
+                if (data is IIndicator) {
+                    _endorsed = IIndicator(data).isEndorsed();
+                    _implemented = IIndicator(data).isImplemented();
+                    updateState();
+                }
+            }
+        }
+
+
+        /**
+         * Updates the state of the renderer according to the flags, which
+         * reflect the object being displayed.
+         */
+        private function updateState():void {
+            if (_endorsed) {
+                if (_implemented)
+                    viewstackImage.selectedChild = viewEndorsedImplemented;
+                else
+                    viewstackImage.selectedChild = viewEndorsedUnimplemented;
+            }
+            else {
+                if (_implemented)
+                    viewstackImage.selectedChild = viewUnendorsedImplemented;
+                else
+                    viewstackImage.selectedChild = viewUnendorsedUnimplemented;
+            }
+        }
+	        
+	  	]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:ViewStack id="viewstackImage"
+                  width="100%"
+                  height="100%"
+                  creationPolicy="all">
+        <mx:HBox id="viewEndorsedImplemented"
+                 width="100%" height="100%" horizontalAlign="center" verticalAlign="middle">
+            <mx:Image
+                    width="16"
+                    height="16"
+                    toolTip="This is an endorsed indicator"
+                    source="img/icons/seamless-endorsed-indicator.gif"
+                    scaleContent="false"
+                    autoLoad="true"
+                    />
+        </mx:HBox>
+        <mx:HBox id="viewEndorsedUnimplemented"
+                 width="100%" height="100%" horizontalAlign="center" verticalAlign="middle">
+            <mx:Image
+                    width="16"
+                    height="16"
+                    toolTip="This is an endorsed indicator, but can not yet be calculated by the system"
+                    source="img/icons/seamless-endorsed-indicator-disabled.gif"
+                    scaleContent="false"
+                    autoLoad="true"
+                    />
+        </mx:HBox>
+        <mx:HBox id="viewUnendorsedImplemented"
+                 width="100%" height="100%" horizontalAlign="center" verticalAlign="middle"
+                 toolTip="This is a model variable"
+                >
+        </mx:HBox>
+        <mx:HBox id="viewUnendorsedUnimplemented"
+                 width="100%" height="100%" horizontalAlign="center" verticalAlign="middle"
+                 toolTip="This is a model variable, but can not yet be calculated by the system"
+                >
+        </mx:HBox>
+    </mx:ViewStack>
+
+</mx:VBox>

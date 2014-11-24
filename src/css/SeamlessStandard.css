@@ -1,0 +1,283 @@
+/* CSS file defining seamless standard */
+
+Application {
+   backgroundColor: #fff9d9;
+   backgroundGradientColors: #E2D4B3, #FFFFFF;
+   backgroundGradientAlphas: 1.0, 1.0;
+   themeColor: #093268;
+   font-size: 11;
+}
+
+ApplicationControlBar {
+   highlightAlphas: 0.42, 0.2;
+   fillAlphas: 1.0, 1.0;
+   fillColors: #FFFFFF, #E2D4B3;
+   backgroundColor: #fff9d9;
+   backgroundAlpha: 0.06;
+   cornerRadius: 5;
+   dropShadowEnabled: false;
+   padding-left: 10;
+   padding-right: 10;
+}
+
+Accordion {
+   fillColors: #ffffff, #aa7903, #ffffff, #fff9d9;
+   selectedFillColors: #ffffff, #fff9d9;
+   themeColor: #aa7903;
+   backgroundColor: #ffffff;
+   borderColor: #DCDCD0;
+   headerStyleName: accordionHeader;
+}
+
+Button {
+	upSkin: Embed(source="/img/icons/seamless-square-button-up.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	disabledSkin: Embed(source="/img/icons/seamless-square-button-flat.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedDisabledSkin: Embed(source="/img/icons/seamless-square-button-flat.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	downSkin: Embed(source="/img/icons/seamless-square-button-down.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	overSkin: Embed(source="/img/icons/seamless-square-button-up-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedUpSkin: Embed(source="/img/icons/seamless-square-button-up-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedOverSkin: Embed(source="/img/icons/seamless-square-button-up-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedDownSkin: Embed(source="/img/icons/seamless-square-button-down-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");	
+}
+
+ComboBox {
+	upSkin: Embed(source="/img/icons/seamless-combobox-up.gif", scaleGridRight="75", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	disabledSkin: Embed(source="/img/icons/seamless-combobox-disabled.gif", scaleGridRight="75", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	downSkin: Embed(source="/img/icons/seamless-combobox-down.gif", scaleGridRight="75", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	overSkin: Embed(source="/img/icons/seamless-combobox-up-highlighted.gif", scaleGridRight="75", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedUpSkin: Embed(source="/img/icons/seamless-combobox-up-highlighted.gif", scaleGridRight="75", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	dropdownStyleName: comboBoxDropdown;
+}
+
+LinkButton {
+	fontWeight: normal;
+	textDecoration: normal;
+	disabledColor: #000000;
+}
+
+TextInput {
+   borderStyle: solid;
+   borderColor: #DCDCD0;
+   borderThickness: 1;
+   cornerRadius: 5;
+   backgroundColor: #ffffff;
+   color: #000000;
+   paddingLeft: 5;
+   paddingRight: 5;
+   dropShadowEnabled: false;
+}
+
+TextArea {
+   paddingLeft: 5;
+   paddingRight: 5;
+   backgroundColor: #ffffff;
+   borderColor: #DCDCD0;
+   color: #000000;
+   borderThickness: 1;
+   cornerRadius: 5;
+}
+
+DataGrid {
+	backgroundAlpha: 1;
+   	alternatingItemColors: #FFFFFF, #FCFCFB;
+   	headerColors: #FCFCFB, #FFFFFF;
+   	horizontalGridLines: false;
+   	verticalGridLines: true;
+   	useRollOver: true;
+   	rollOverColor: #ffcc66;
+   	textRollOverColor: #000000;
+   	borderThickness: 1;
+   	selectionColor: #DCDCD0;
+   	color: #000000;
+   	textSelectedColor: #0006F9;
+   	headerStyleName: dataGridHeader;
+}
+
+TabNavigator {
+   	tabStyleName: "myTabs";
+   	firstTabStyleName: "myTabs";
+   	lastTabStyleName: "myTabs";
+   	selectedTabTextStyleName: "mySelectedTabs";
+   	cornerRadius: 2;
+    borderThickness: 0;
+	horizontalAlign: center;
+}
+
+
+TabBar {
+	tabStyleName: myTabs;
+	selectedTabTextStyleName: tabBarSelectedTabText;
+}
+
+
+.myTabs {
+   	highlightAlphas: 0.3, 0.33;
+   	fillAlphas: 1.0, 0.3, 1.0, 0.3;
+   	fillColors: #E2CA91, #EADDBF;
+   	themeColor: #093268;
+   	cornerRadius: 2;
+	borderColor: #B7BABC;
+}
+
+
+.mySelectedTabs {
+}
+
+ButtonBar {
+   buttonHeight: 18;
+   horizontalGap: 0;
+   textIndent: 0;
+   letterSpacing: 0;
+   buttonStyleName: "mybuttonBarButtonStyle";
+   firstButtonStyleName: "mybuttonBarFirstButtonStyle";
+   lastButtonStyleName: "mybuttonBarLastButtonStyle";
+}
+
+
+.mybuttonBarButtonStyle {
+   highlightAlphas: 0.3, 0.33;
+   fillAlphas: 1.0, 0.3, 1.0, 0.3;
+   fillColors: #E2CA91, #EADDBF;
+   themeColor: #093268;
+   cornerRadius: 10;
+}
+
+.mybuttonBarFirstButtonStyle {
+   highlightAlphas: 0.3, 0.33;
+   fillAlphas: 1.0, 1.0, 1.0, 1.0;
+   fillColors: #E2CA91, #EADDBF;
+   themeColor: #093268;
+   borderColor: #E2D4B3;
+   cornerRadius: 5;
+}
+
+.mybuttonBarLastButtonStyle {
+   highlightAlphas: 0.3, 0.33;
+   fillAlphas: 1.0, 1.0, 1.0, 1.0;
+   fillColors: #E2CA91, #EADDBF;
+   themeColor: #093268;
+   borderColor: #E2D4B3;
+   cornerRadius: 5;
+}
+
+.applicationTitle {
+	font-family:"Arial";
+	color:#093268;
+	font-size:14;
+	font-style:normal;
+	font-thickness:1;
+	font-weight:bold;
+	letterSpacing: 2;
+	fontAntiAliasType: advanced;
+	kerning: true;
+}
+
+.projectTitle {
+	font-family:"Arial";
+	color:#093268;
+	font-size:11;
+	font-style:normal;
+	font-thickness:1;
+	font-weight:bold;
+}
+
+.taskTitle {
+	font-family:"Arial";
+	color:#093268;
+	font-size:14;
+	font-style:normal;
+	font-thickness:1;
+	font-weight:bold;
+}
+
+.errorText {
+	font-family:"Arial";
+	horizontal-align:center;
+	color:#FF0000;
+	font-size:14;
+	font-style:normal;
+	font-thickness:2;
+	font-weight:bold;
+}
+
+.neutralText {
+	font-family:"Arial";
+	horizontal-align:center;
+	color:#000000;
+	font-size:14;
+	font-style:normal;
+	font-thickness:1;
+	font-weight:bold;
+}
+
+.goodText {
+	font-family:"Arial";
+	horizontal-align:center;
+	color:#00FF00;
+	font-size:14;
+	font-style:normal;
+	font-thickness:2;
+	font-weight:bold;
+}
+
+.flattenedButton {
+   cornerRadius: 0;
+   paddingLeft: 0;
+   paddingRight: 0;
+   highlightAlphas: 0, 0;
+   fillAlphas: 0, 0, 0, 0;
+   borderColor: #ffffff;
+}
+
+.scale9CoffeeStainBackground {
+    background-image: Embed("../img/images/SeamlessBackground.png", 
+        scaleGridTop="30", scaleGridBottom="200",
+        scaleGridLeft="10", scaleGridRight="50");
+
+    background-size:"100%";            
+}
+
+.dataGridHeader {
+}
+
+Button.primary {
+	upSkin: Embed(source="../img/icons/seamless-square-button-up.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	disabledSkin: Embed(source="../img/icons/seamless-square-button-flat.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedDisabledSkin: Embed(source="../img/icons/seamless-square-button-flat.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	downSkin: Embed(source="../img/icons/seamless-square-button-down.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	overSkin: Embed(source="../img/icons/seamless-square-button-up-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedUpSkin: Embed(source="/img/icons/seamless-square-button-up-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedOverSkin: Embed(source="/img/icons/seamless-square-button-up-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedDownSkin: Embed(source="/img/icons/seamless-square-button-down-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");	
+}
+
+Button.secondary {
+	upSkin: Embed(source="/img/icons/seamless-square-button-flat.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	disabledSkin: Embed(source="/img/icons/seamless-square-button-flat.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedDisabledSkin: Embed(source="/img/icons/seamless-square-button-flat.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	downSkin: Embed(source="/img/icons/seamless-square-button-flat-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	overSkin: Embed(source="/img/icons/seamless-square-button-flat-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedUpSkin: Embed(source="/img/icons/seamless-square-button-flat-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedOverSkin: Embed(source="/img/icons/seamless-square-button-flat-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");
+	selectedDownSkin: Embed(source="/img/icons/seamless-square-button-flat-highlighted.gif", scaleGridRight="18", scaleGridLeft="6", scaleGridTop="6", scaleGridBottom="18");	
+}
+
+.tabBarSelectedTabText
+{
+}
+.accordionHeader
+{
+	fillAlphas: 1.0, 0.3, 0.3, 0.3;
+	fillColors: #E2D4B3, #E2D4B3;
+	borderColor: #E2D4B3;
+}
+@font-face
+{
+	fontFamily: Arial;
+	fontWeight: bold;
+	fontStyle: normal;
+	src: url("../fonts/Arial_Bold.ttf");
+}
+.comboBoxDropdown
+{
+}

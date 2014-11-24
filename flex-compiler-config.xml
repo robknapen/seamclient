@@ -1,0 +1,23 @@
+<flex-config xmlns="http://www.adobe.com/2006/flex-config">
+    <compiler>
+        <debug>true</debug>
+        <source-path>
+            <path-element>src</path-element>
+        </source-path>
+        <include-libraries>
+            <library>libs/AutoComplete.swc</library>
+            <library>libs/AutoComplete.swc</library>
+            <library>libs/datavisualization.swc</library>
+            <library>libs/datavisualization_rb.swc</library>
+            <library>libs/flare.swc</library>
+            <library>libs/ilog-elixir.swc</library>
+            <library>libs/ilog-elixir_rb.swc</library>
+        </include-libraries>
+    </compiler>
+    <file-specs>
+        <path-element>src/wallace.mxml</path-element>
+    </file-specs>
+    <output>
+        /data/USERDATA/knape001/Projects/seamless-association/dev-idea/trunk/wallace/out/production/Wallace/wallace.swf
+    </output>
+</flex-config>

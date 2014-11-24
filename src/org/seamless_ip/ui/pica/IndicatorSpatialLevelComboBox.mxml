@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: IndicatorSpatialLevelComboBox.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:ComboBox xmlns:mx="http://www.adobe.com/2006/mxml"
+             change="{onChange(event)}"
+        >
+    <mx:Script>
+        <![CDATA[
+        import mx.controls.dataGridClasses.DataGridListData;
+        import mx.controls.listClasses.ListData;
+
+        import org.seamless_ip.services.transferobjects.pica.PICASpatialLevel;
+
+        private var candidateValue:Object;
+        private var valueDirty:Boolean = false;
+        private var candidateDataProvider:Object;
+        private var dataProviderDirty:Boolean = false;
+
+        private function applyValue(val:Object):void {
+            if ((val != null) && (dataProvider != null)) {
+                for (var i:int = 0; i < dataProvider.length; i++) {
+                    if (val is PICASpatialLevel) {
+                        if ((val as PICASpatialLevel).id == (dataProvider[i] as PICASpatialLevel).id) {
+                            selectedIndex = i;
+                            return;
+                        }
+                    } else if (val == dataProvider[i]) {
+                        selectedIndex = i;
+                        return;
+                    }
+                }
+            }
+            selectedIndex = -1;
+        }
+
+        public function set value(val:Object):void {
+            candidateValue = val;
+            valueDirty = true;
+            invalidateProperties();
+        }
+
+        override public function set dataProvider(value:Object):void {
+            candidateDataProvider = value;
+            dataProviderDirty = true;
+            invalidateProperties();
+        }
+
+        override protected function commitProperties():void {
+            super.commitProperties();
+            if (dataProviderDirty) {
+                super.dataProvider = candidateDataProvider;
+                dataProviderDirty = false;
+            }
+            if (valueDirty) {
+                applyValue(candidateValue);
+                valueDirty = false;
+            }
+        }
+
+        /* A small override of “set data” in mx.controls. ComboBox
+         This allows to use value-aware version in DataGrid and List-s */
+        override public function set data(data:Object):void {
+            super.data = data;
+            if (listData && listData is DataGridListData) {
+                candidateValue = data[DataGridListData(listData).dataField];
+                valueDirty = true;
+            } else if (listData is ListData && ListData(listData).labelField in data) {
+                candidateValue = data[ListData(listData).labelField];
+                valueDirty = true;
+            }
+        }
+
+        /*  override public function get data():Object {
+
+         return candidateValue;
+         } */
+
+        private function onChange(e:Event):void
+        {
+            super.selectedItem = e.currentTarget;
+        }
+        ]]>
+    </mx:Script>
+</mx:ComboBox>

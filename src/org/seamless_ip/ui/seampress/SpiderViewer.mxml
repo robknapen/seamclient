@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: SpiderViewer.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%"
+         xmlns:ilog="http://www.ilog.com/2007/ilog/flex">
+
+    <!--
+    	Seam:PRESS component to visualise data in a spider/radar diagram.
+
+    	@author Rob Knapen
+    -->
+    <mx:Script>
+		<![CDATA[
+        import ilog.charts.AngularAxis;
+
+        import ilog.charts.series.RadarLineSeries;
+
+        import mx.charts.CategoryAxis;
+        import mx.charts.LinearAxis;
+        import mx.collections.ArrayCollection;
+        import mx.collections.Sort;
+        import mx.collections.SortField;
+
+        private var hashCodeInfo:Dictionary = null;
+        private var indicatorTitles:ArrayCollection = new ArrayCollection();
+        private var visualisation:Visualisation;
+        private var values:IndicatorValues;
+
+
+        public function update(visualisation:Visualisation, values:IndicatorValues):void {
+            this.visualisation = visualisation;
+            this.values = values;
+
+            // setup the combobox to select on properties of the indicator values
+            hashCodeInfo = values.createHashCodeInfo(visualisation.experimentIds, visualisation.indicatorIds);
+            var properties:ArrayCollection = new ArrayCollection();
+            var obj:Object;
+            for (var hashcode:* in hashCodeInfo) {
+                obj = new Object();
+                obj.hashCode = hashcode;
+                obj.label = hashCodeInfo[hashcode].label;
+                properties.addItem(obj);
+            }
+
+            var sortField:SortField = new SortField();
+            sortField.name = "label";
+            sortField.caseInsensitive = true;
+            sortField.numeric = false;
+            properties.sort = new Sort();
+            properties.sort.fields = [sortField];
+            properties.refresh();
+            comboBoxProperties.dataProvider = properties;
+
+            // setup the combobox to select output calculation type
+            var valueTypes:ArrayCollection = ValueType.values;
+            comboBoxValueTypes.dataProvider = valueTypes;
+
+            // retrieve indicator titles for use as axis labels
+            indicatorTitles = values.getTitles(IndicatorValues.INDICATOR_TITLE, visualisation.indicatorIds);
+
+            refresh();
+        }
+
+
+        private function refresh():void {
+            if ((visualisation != null) && (values != null)) {
+
+                var selectedProperty:Object = comboBoxProperties.selectedItem;
+
+                var data:ArrayCollection = values.createFlatDataProvider(
+                        visualisation.experimentIds,
+                        visualisation.indicatorIds,
+                        ValueType(comboBoxValueTypes.selectedItem),
+                        true,
+                        selectedProperty.hashCode
+                        );
+
+                valuesChart.dataProvider = data;
+
+                // Angular axis corresponds to the perimeter of the chart
+                // and takes values that are categories rather than
+                // numerics. This axis maps a set of values such as
+                // stock ticket symbols, state names, or indicators.
+                AngularAxis(valuesChart.angularAxis).categoryField = "Indicator";
+                AngularAxis(valuesChart.angularAxis).labelFunction = createAngularAxisLabel;
+
+                // Radial axis corresponds to the radius of the chart.
+                // This axis maps numeric data to a distance between
+                // the center and the perimeter of the chart. By default
+                // it is set to an instance of the LinearAxis class.
+                var radialAxis:LinearAxis = new LinearAxis();
+                radialAxis.baseAtZero = true;
+                radialAxis.displayName = "Value";
+                valuesChart.radialAxis = radialAxis;
+
+                // add series to chart
+                var series:Array = valuesChart.series;
+                series.length = 0;
+                var cs:RadarLineSeries;
+
+                for each (var id:String in visualisation.experimentIds)
+                {
+                    cs = new RadarLineSeries();
+                    cs.dataProvider = data;
+                    cs.categoryField = "Indicator";
+                    cs.dataField = values.retrieveTitle(IndicatorValues.EXPERIMENT_TITLE, id);
+                    cs.displayName = cs.dataField;
+                    series.push(cs);
+                }
+
+                valuesChart.series = series;
+                valuesChart.invalidateDisplayList();
+            }
+        }
+
+        private function createAngularAxisLabel(categoryValue:Object, previousCategoryValue:Object, axis:CategoryAxis, categoryItem:Object):String
+        {
+            var label:String = categoryValue.toString();
+            var pos:int = label.lastIndexOf("[");
+            var units:String = label.substr(pos);
+            var title:String = label.substr(0, pos - 1);
+
+            if (title.length > 30)
+                title = title.substr(0, 27) + "...";
+            if (label.length <= 30)
+                return label;
+
+            return title + " " + units;
+        }
+			
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+
+    <mx:VBox width="100%"
+             horizontalAlign="center" verticalAlign="middle"
+             borderStyle="solid" cornerRadius="10"
+             horizontalGap="4"
+             paddingLeft="10" paddingRight="10"
+             paddingTop="5" paddingBottom="5"
+             backgroundAlpha="0.5" backgroundColor="#FCFBD9">
+        <mx:HBox width="100%" verticalAlign="middle">
+            <mx:Label text="Show:" textAlign="right" fontWeight="bold"/>
+            <mx:ComboBox id="comboBoxProperties"
+                         change="refresh()"
+                    />
+            <mx:Spacer width="100%"/>
+            <mx:Label text="Display values as:" textAlign="right" fontWeight="bold"/>
+            <mx:ComboBox id="comboBoxValueTypes"
+                         change="refresh()"
+                    />
+        </mx:HBox>
+    </mx:VBox>
+
+    <mx:HBox width="100%" height="100%"
+             horizontalAlign="center" verticalAlign="middle"
+             borderStyle="solid" cornerRadius="10"
+             horizontalGap="4"
+             paddingLeft="10" paddingRight="10"
+             paddingTop="5" paddingBottom="5"
+             backgroundAlpha="0.5" backgroundColor="#FCFBD9">
+
+        <ilog:RadarChart id="valuesChart"
+                         width="100%" height="100%"
+                         dataTipMode="single"
+                         showDataTips="true">
+        </ilog:RadarChart>
+
+    </mx:HBox>
+
+    <mx:HBox width="100%"
+             horizontalAlign="center" verticalAlign="middle"
+             borderStyle="solid" cornerRadius="10"
+             horizontalGap="4"
+             paddingLeft="10" paddingRight="10"
+             paddingTop="5" paddingBottom="5"
+             backgroundAlpha="0.5" backgroundColor="#FCFBD9">
+
+        <mx:Legend id="valuesLegend"
+                   direction="horizontal"
+                   dataProvider="{valuesChart}"
+                />
+    </mx:HBox>
+
+</mx:VBox>

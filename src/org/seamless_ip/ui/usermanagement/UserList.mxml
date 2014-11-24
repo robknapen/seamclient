@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: UserList.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+         xmlns:usermanagement="org.seamless_ip.ui.usermanagement.*"
+         xmlns:ns="org.seamless_ip.ui.common.*"
+         width="100%"
+         height="100%"
+         paddingLeft="10"
+         paddingRight="10"
+         paddingTop="10"
+         paddingBottom="10"
+         showEffect="viewIn"
+         hideEffect="viewOut"
+
+         creationComplete="creationCompleteHandler(event)">
+    <mx:Metadata>
+        [Event(name="create", type="flash.events.Event")]
+        [Event(name="update", type="flash.events.Event")]
+        [Event(name="delete", type="flash.events.Event")]
+        [Event(name="refresh", type="flash.events.Event")]
+    </mx:Metadata>
+
+    <!--
+        View for editing, removing and adding users.
+
+        @author Michiel Rop
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        /** ArrayCollection of User instances */
+        [Bindable]
+        public var users:ArrayCollection = new ArrayCollection();
+
+        [Bindable]
+        public var progressMessage:String = "Idle";
+
+        [Bindable]
+        public var downLoadInProgress:Boolean;
+
+        public static const CREATE:String = "create";
+        public static const UPDATE:String = "update";
+        public static const DELETE:String = "delete";
+        public static const REFRESH:String = "refresh";
+        public static const CHANGE:String = "change";
+        public static const SHOW:String = "Show";
+        public static const HIDE:String = "Hide";
+        public static const CLOSE:String = "Close";
+
+
+        /** The currently selected user */
+        [Bindable]
+        public var user:User;
+
+
+        private function creationCompleteHandler(event:Event):void {
+            dispatchEvent(new Event(REFRESH));
+        }
+
+        private function refreshHandler(event:MouseEvent):void {
+            dispatchEvent(new Event(REFRESH));
+        }
+
+        private function editHandler(event:Event):void {
+            dispatchEvent(new Event(UPDATE));
+        }
+
+        private function newHandler(event:MouseEvent):void {
+            dispatchEvent(new Event(CREATE));
+        }
+
+        private function removeHandler(event:MouseEvent):void {
+            dispatchEvent(new Event(DELETE));
+        }
+
+        private function changeHandler(event:Event):void {
+            user = userListDataGrid.selectedItem as User;
+            dispatchEvent(new Event(CHANGE));
+        }
+
+        public function show():void {
+            includeInLayout = true;
+            visible = true;
+        }
+
+        public function hide():void {
+            includeInLayout = false;
+            visible = false;
+        }
+
+        public function closeHandler(event:Event):void {
+            dispatchEvent(new Event(CLOSE));
+        }
+			
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Effects
+         Used when changing views.
+     ===========================================================================
+     -->
+
+    <mx:Fade id="viewIn" duration="600" alphaFrom="0" alphaTo="1"/>
+    <mx:Fade id="viewOut" duration="100" alphaFrom="1" alphaTo="0"/>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:ViewStack id="mainView"
+                  width="100%" height="100%"
+                  borderStyle="solid" cornerRadius="5"
+                  alpha="0.8"
+                  creationPolicy="all"
+                  paddingLeft="5" paddingRight="5"
+                  paddingBottom="5" paddingTop="5"
+            >
+
+        <ns:ServerProgressView id="progressView"
+                               width="100%"
+                               height="100%"
+                               progressMessage="{progressMessage}"
+                               showEffect="viewIn"
+                               hideEffect="viewOut"
+                />
+        <mx:VBox id="userListView">
+            <mx:HBox width="100%" verticalAlign="bottom">
+
+                <mx:Label text="Users currently available on the SEAMLESS server:"/>
+                <mx:Spacer width="100%"/>
+                <mx:Image source="@Embed('/img/icons/seamless-people.gif')"/>
+            </mx:HBox>
+            <mx:AdvancedDataGrid width="100%" id="userListDataGrid"
+                                 height="100%"
+                                 doubleClickEnabled="true"
+                                 wordWrap="true"
+                                 variableRowHeight="true"
+                                 dataProvider="{users}"
+                                 change="changeHandler(event)"
+                                 doubleClick="editHandler(event)"
+                    >
+                <mx:columns>
+                    <mx:AdvancedDataGridColumn headerText="account name" dataField="accountName"/>
+                    <mx:AdvancedDataGridColumn headerText="first name" dataField="firstName"/>
+                    <mx:AdvancedDataGridColumn headerText="last name" dataField="lastName"/>
+                    <mx:AdvancedDataGridColumn headerText="e-mail" dataField="email"/>
+                </mx:columns>
+            </mx:AdvancedDataGrid>
+
+        </mx:VBox>
+    </mx:ViewStack>
+    <mx:HBox width="100%">
+        <mx:Button label="New..."
+                   width="120"
+                   icon="@Embed('/img/icons/seamless-file.gif')"
+                   disabledIcon="@Embed('/img/icons/seamless-file-greyed.gif')"
+                   toolTip="Create a new user"
+                   enabled="{!downLoadInProgress}"
+                   click="newHandler(event)"/>
+        <mx:Button id="openUserButton"
+                   label="Edit..."
+                   width="120"
+                   click="editHandler(event)"
+                   enabled="{!((downLoadInProgress)||(user==null))}"
+                   toolTip="Open the selected user"
+                   icon="@Embed('/img/icons/seamless-folder.gif')"
+                   disabledIcon="@Embed('/img/icons/seamless-folder-greyed.gif')"
+                />
+        <mx:Button label="Refresh"
+                   width="120"
+                   click="refreshHandler(event)"
+                   toolTip="Synchronise the list of users with the server"
+                   icon="@Embed('/img/icons/seamless-sync.gif')"
+                   enabled="{!downLoadInProgress}"
+                   disabledIcon="@Embed('/img/icons/seamless-sync-greyed.gif')"/>
+        <mx:Spacer width="100%"/>
+        <mx:Button label="Remove"
+                   width="120"
+                   click="removeHandler(event)"
+                   icon="@Embed('/img/icons/seamless-delete.gif')"
+                   disabledIcon="@Embed('/img/icons/seamless-delete-greyed.gif')"
+                   toolTip="Remove the selected user"
+                   enabled="{!((user==null)||(downLoadInProgress))}"/>
+        <mx:Button label="Close"
+                   width="120"
+                   click="closeHandler(event)"
+                   icon="@Embed('/img/icons/seamless-delete.gif')"
+                   disabledIcon="@Embed('/img/icons/seamless-delete-greyed.gif')"
+                   toolTip="Exit the user Management"
+                   enabled="{!(downLoadInProgress)}"/>
+    </mx:HBox>
+</mx:VBox>

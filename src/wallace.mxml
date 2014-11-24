@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: wallace.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Application
+        xmlns:mx="http://www.adobe.com/2006/mxml"
+        xmlns:lobby="org.seamless_ip.ui.login.*"
+        xmlns:projects="org.seamless_ip.ui.projects.*"
+        xmlns:common="org.seamless_ip.ui.common.*"
+        xmlns:usermanagement="org.seamless_ip.ui.usermanagement.*"
+        layout="absolute"
+        preinitialize="configurationService.send()"
+        creationComplete="init()"
+        xmlns:local="*">
+        
+    <mx:HTTPService id="configurationService"
+                    url="configuration.xml"
+                    useProxy="false"
+                    resultFormat="e4x"
+                    result="configurationServiceResultHandler(event)"
+                    fault="configuration.initDefault(event)"/>
+
+    <local:Configuration id="configuration"/>
+
+
+    <mx:Style source="css/SeamlessStandard.css"/>
+    <mx:Style source="css/SeamlessSkin.css"/>
+
+    <mx:Script>
+        <![CDATA[
+
+        /**
+         * Root component of the S-IF GUI, serving as a container for all the screens
+         * and providing the main navigation structure.
+         */
+
+        import mx.rpc.events.ResultEvent;
+        import mx.controls.Alert;
+
+        import org.seamless_ip.ui.common.FlexReflectionHelper;
+        import org.seamless_ip.ui.projects.ProjectEvent;
+        import org.seamless_ip.ui.login.UserLoggedInEvent;
+
+        import mx.binding.utils.BindingUtils;
+
+        import org.seamless_ip.ui.enums.EnumManager;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        import mx.managers.PopUpManager;
+
+        import org.seamless_ip.ui.about.ApplicationInfoDialogView;
+
+        [Bindable] public var activeUser:User = null;
+        [Bindable] public var activeProject:Project = null;
+
+        // these vars are accessed by other components!
+        public var SAVEDZIP_URL:String;
+        public var MANUAL_URL:String;
+        public var SEAMLESS_WEBSITE_URL:String = "http://www.seamless-ip.org/";
+
+        private var _enumManager:EnumManager = null;
+        private var _glossyStyleLoaded:Boolean = false;
+        private var _largeFontStyleLoaded:Boolean = false;
+
+
+        private function configurationServiceResultHandler(event:ResultEvent):void {
+            configuration.init(event);
+            SAVEDZIP_URL = configuration.savedZipUrl;
+            MANUAL_URL = configuration.manualUrl;
+            SEAMLESS_WEBSITE_URL = configuration.seamlessWebsiteUrl;
+        }
+
+
+        private function init():void {
+            FlexReflectionHelper.initialize();
+            userManagementViewStack.addEventListener(UserManagementCanvas.CLOSE, closeUserManagementHandler);
+        }
+
+
+        private function closeUserManagementHandler(event:Event):void {
+            Alert.show("Please log in again for security reasons.", "Log in again");
+            logout();
+        }
+
+
+        /**
+         * Displays a dialog with information about the application.
+         */
+        private function showInfoDialog():void
+        {
+            var dialog:ApplicationInfoDialogView = ApplicationInfoDialogView(
+                    PopUpManager.createPopUp(this, ApplicationInfoDialogView, true)
+                    );
+            dialog.applicationName = configuration.applicationName;
+            dialog.applicationVersion = configuration.applicationVersion + "; " + configuration.applicationDate;
+            PopUpManager.centerPopUp(dialog);
+        }
+
+
+        /**
+         * Updates the titles in the main window to show the application and
+         * current project information.
+         */
+        private function updateTitle():void {
+            // show user name and role in title
+            if (activeUser != null) {
+                labelApplication.text = "User: ";
+                if (activeUser.firstName != null)
+                    labelApplication.text += activeUser.firstName;
+                else
+                    labelApplication.text += activeUser.accountName;
+            }
+
+            // show title of opened project
+            if (activeProject != null) {
+                labelProject.text = activeProject.title;
+                if (activeProject.published)
+                    labelProject.text += " (published)";
+                else
+                    labelProject.text += " (not published)";
+            }
+            else {
+                labelProject.text = "No project";
+            }
+        }
+
+
+        /**
+         * Toggle large font CSS style sheet.
+         * 
+         * Note: Added internal tracking to avoid null pointer bug in Flex
+         * SDK 3.5 when unloading a style that hasn't been loaded before.
+         */
+        private function toggleLargeFontStyle():void {
+            if (checkBoxLargeFonts.selected) {
+            	if (!_largeFontStyleLoaded) {
+                	StyleManager.loadStyleDeclarations("css/SeamlessLarge.swf");
+                	_largeFontStyleLoaded = true;
+             	}
+            } else {
+            	if (_largeFontStyleLoaded) {
+                	StyleManager.unloadStyleDeclarations("css/SeamlessLarge.swf");
+                	_largeFontStyleLoaded = false;
+             	}
+            }
+        }
+
+
+        /**
+         * Toggle glossy CSS style sheet.
+         * 
+         * Note: Added internal tracking to avoid null pointer bug in Flex
+         * SDK 3.5 when unloading a style that hasn't been loaded before.
+         */
+        private function setGlossyStyle(enable:Boolean = true):void {
+            if (enable) {
+            	if (!_glossyStyleLoaded) {
+                	StyleManager.loadStyleDeclarations("css/SeamlessGlossy.swf");
+                	_glossyStyleLoaded = true;
+             	}
+            } else {
+            	if (_glossyStyleLoaded) {
+	                StyleManager.unloadStyleDeclarations("css/SeamlessGlossy.swf");
+	                _glossyStyleLoaded = false;
+	            }
+            }
+        }
+
+
+        private function userLoggedInHandler(event:UserLoggedInEvent):void
+        {
+            activeUser = event.user;
+            updateTitle();
+
+            // switch style when wanted
+            setGlossyStyle(activeUser.canDo("USE", "GLOSSY_STYLE"));
+
+            viewStackMain.selectedChild = introViews;
+            viewStackIntro.selectedChild = progressView;
+            progressView.progressMessage = "Caching data, please wait...";
+
+            if (_enumManager == null)
+                _enumManager = EnumManager.instance;
+            else
+                _enumManager.init();
+
+            BindingUtils.bindSetter(updateInitializeState, _enumManager, "initInProgress");
+            BindingUtils.bindSetter(updateProgressMessage, _enumManager, "progressMessage");
+        }
+
+
+        public function updateInitializeState(val:String):void {
+            if (!_enumManager.initInProgress) {
+                progressView.progressMessage = "Completed";
+                viewStackMain.selectedChild = introViews;
+                viewStackIntro.selectedChild = selectProjectView;
+            }
+        }
+
+
+        public function updateProgressMessage(val:String):void {
+            progressView.progressMessage = val;
+        }
+
+
+        private function projectOpenedHandler(event:ProjectEvent):void {
+            activeProject = event.project;
+            updateTitle();
+            viewStackMain.selectedChild = projectContentView;
+        }
+
+
+        private function logout():void {
+            if (activeProject != null)
+                closeProject();
+
+            setGlossyStyle(false);
+
+            viewStackMain.selectedChild = introViews;
+            viewStackIntro.selectedChild = lobbyView;
+
+            activeUser = null;
+            updateTitle();
+        }
+
+
+        private function closeProject():void {
+            // TODO if project has been modified, ask user to save or not
+            this.dispatchEvent(new ProjectEvent(ProjectEvent.PROJECT_CLOSED, activeProject));
+            activeProject = null;
+            updateTitle();
+            viewStackMain.selectedChild = introViews;
+            viewStackIntro.selectedChild = selectProjectView;
+        }
+
+
+        private function getHelp():void {
+            var uDocumentoPDF:URLRequest = new URLRequest(MANUAL_URL);
+            navigateToURL(uDocumentoPDF);
+        }
+
+
+        private function openFeedbackWebsite():void {
+            var request:URLRequest = new URLRequest(configuration.errorReportingUrl);
+            navigateToURL(request);
+        }
+
+        private function openOntologyBrowserWebsite():void {
+            var request:URLRequest = new URLRequest(configuration.ontologyBrowserUrl);
+            navigateToURL(request);
+        }
+
+        private function openUserManagement():void {
+            viewStackMain.selectedChild = userManagementViewStack;
+        }
+
+        private function allowAction(user:User, task:String, right:String):Boolean {
+            return ((user != null) && (user.canDo(task, right)));
+        }
+
+        ]]>
+    </mx:Script>
+
+
+    <!--
+     ===========================================================================
+         Effects
+         Used when changing views.
+     ===========================================================================
+     -->
+
+    <mx:Fade id="viewInit" duration="500" alphaFrom="0" alphaTo="1"/>
+    <mx:WipeDown id="viewIn" duration="100"/>
+    <mx:WipeUp id="viewOut" duration="100"/>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:ApplicationControlBar dock="true" cornerRadius="1" barColor="#B9C3EC">
+
+        <!-- Seamless application logo image -->
+        <mx:VBox height="100%" verticalAlign="middle">
+            <mx:ViewStack id="imageLogo"
+                          click="showInfoDialog()"
+                          toolTip="Click here for more information..."
+                          mouseOver="{imageLogo.selectedChild=mouseOverView}"
+                          mouseOut="{imageLogo.selectedChild=mouseOutView}"
+                    >
+                <mx:HBox id="mouseOutView">
+                    <mx:Image id="logoGreyed"
+                              source="@Embed('/img/logo/seamless-logo-faded.png')"
+                              scaleContent="true"
+                            />
+                </mx:HBox>
+                <mx:HBox id="mouseOverView">
+                    <mx:Image id="logoHighlighted"
+                              source="@Embed('/img/logo/seamless-logo.png')"
+                              scaleContent="true"
+                            />
+                </mx:HBox>
+            </mx:ViewStack>
+        </mx:VBox>
+
+        <!-- Application title, user and project name -->
+        <mx:VBox width="100%" borderStyle="none">
+            <mx:HBox width="100%"
+                     borderStyle="none" cornerRadius="10" paddingLeft="5" paddingRight="5">
+                <mx:Label id="labelApplication"
+                          width="100%"
+                          styleName="applicationTitle"
+                          text="SEAMLESS-IF"
+                          textAlign="center"/>
+            </mx:HBox>
+            <mx:HBox width="100%"
+                     borderStyle="none" cornerRadius="10" paddingLeft="5" paddingRight="5">
+                <mx:Label id="labelProject"
+                          width="100%"
+                          styleName="projectTitle"
+                          text="No project"
+                          textAlign="center"
+                        />
+            </mx:HBox>
+        </mx:VBox>
+
+        <!-- Top right main control buttons -->
+        <mx:VBox
+                height="100%"
+                verticalGap="2"
+                verticalAlign="middle"
+                >
+
+            <mx:HBox horizontalGap="2">
+                <mx:Button id="closeProjectButton"
+                           styleName="primary"
+                           width="24" height="24"
+                           toolTip="Close the current project"
+                           icon="@Embed('/img/icons/seamless-home.gif')"
+                           disabledIcon="@Embed('/img/icons/seamless-home-greyed.gif')"
+                           enabled="{(activeProject != null)}"
+                           click="closeProject()"
+                        />
+                <mx:Button id="helpButton"
+                           styleName="primary"
+                           width="24" height="24"
+                           enabled="true"
+                           toolTip="Click to view the help information"
+                           icon="@Embed('/img/icons/seamless-help.gif')"
+                           disabledIcon="@Embed('/img/icons/seamless-help-greyed.gif')"
+                           click="getHelp()"
+                        />
+                <mx:Button id="feedbackButton"
+                           styleName="primary"
+                           width="24" height="24"
+                           enabled="true"
+                           toolTip="Report a bug or request a feature"
+                           icon="@Embed('/img/icons/seamless-bugs.gif')"
+                           disabledIcon="@Embed('/img/icons/seamless-bugs-greyed.gif')"
+                           click="openFeedbackWebsite()"
+                        />
+                <mx:Button id="ontologyBrowserButton"
+                           styleName="primary"
+                           width="24" height="24"
+                           toolTip="Go to the Ontology Browser website"
+                           icon="@Embed('/img/icons/seamless-owl.gif')"
+                           disabledIcon="@Embed('/img/icons/seamless-owl-greyed.gif')"
+                           click="openOntologyBrowserWebsite()"
+                        />
+                <mx:Button id="userManagementButton"
+                           styleName="primary"
+                           width="24" height="24"
+                           toolTip="Go to user management"
+                           icon="@Embed('/img/icons/seamless-people-24.gif')"
+                           disabledIcon="@Embed('/img/icons/seamless-people-24-greyed.gif')"
+                           enabled="{allowAction(activeUser, 'USE', 'USER_MANAGEMENT')}"
+                           click="openUserManagement()"
+                        />
+
+                <mx:Button id="logoutButton"
+                           styleName="primary"
+                           width="24" height="24"
+                           toolTip="Log out from the application"
+                           icon="@Embed('/img/icons/seamless-exit.gif')"
+                           disabledIcon="@Embed('/img/icons/seamless-exit-greyed.gif')"
+                           enabled="{ !((activeUser == null) || (viewStackMain.selectedChild==userManagementViewStack))}"
+                           click="logout()"
+                        />
+            </mx:HBox>
+            <mx:CheckBox id="checkBoxLargeFonts"
+                         label="Larger Fonts"
+                         selected="false"
+                         enabled="true"
+                         click="toggleLargeFontStyle()"
+                         width="100%"/>
+        </mx:VBox>
+
+    </mx:ApplicationControlBar>
+
+    <!-- Main content area -->
+    <mx:VBox width="100%" height="100%"
+             verticalGap="5">
+
+        <mx:ViewStack id="viewStackMain"
+                      width="100%"
+                      height="100%"
+                      paddingBottom="0"
+                      paddingTop="0"
+                      paddingLeft="0"
+                      paddingRight="0"
+                      creationCompleteEffect="{viewInit}"
+                      borderStyle="none"
+                      styleName="scale9CoffeeStainBackground"
+                >
+
+            <!-- Introduction screens, before navigation menu is available -->
+            <mx:HBox id="introViews" label="Intro"
+                     width="100%" height="100%"
+                     paddingTop="5" paddingBottom="5"
+                     paddingLeft="5" paddingRight="5"
+                    >
+
+                <mx:ViewStack id="viewStackIntro"
+                              width="100%"
+                              height="100%"
+                              borderStyle="solid"
+                              backgroundColor="#FFFFFF"
+                              cornerRadius="10"
+                              backgroundAlpha="0.6"
+                              paddingBottom="5"
+                              paddingLeft="5"
+                              paddingRight="5"
+                              paddingTop="5"
+                        >
+
+                    <lobby:LoginView id="lobbyView"
+                                     width="100%"
+                                     height="100%"
+                                     userLoggedIn="{userLoggedInHandler(event)}"
+                            />
+
+                    <common:ServerProgressView id="progressView"
+                                               width="100%"
+                                               height="100%"
+                            />
+
+                    <projects:ProjectDirectory id="selectProjectView"
+                                               width="100%"
+                                               height="100%"
+                                               user="{activeUser}"
+                                               projectOpened="{projectOpenedHandler(event)}"
+                                               show="selectProjectView.init()"
+                            />
+
+                </mx:ViewStack>
+
+            </mx:HBox>
+
+            <!-- Project related screens container, shows navigation menu -->
+            <projects:ProjectContent id="projectContentView"
+                                     project="{activeProject}"
+                                     user="{activeUser}"
+                                     width="100%"
+                                     height="100%"
+                    />
+            <usermanagement:UserManagementCanvas
+                    id="userManagementViewStack" activeUser="{activeUser}"
+                    width="100%"
+                    height="100%"/>
+
+
+        </mx:ViewStack>
+
+    </mx:VBox>
+</mx:Application>

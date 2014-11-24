@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: Legend.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml">
+    <mx:states>
+        <mx:State name="viewOnly">
+            <mx:RemoveChild target="{hbox1}"/>
+        </mx:State>
+    </mx:states>
+
+    <mx:Metadata>
+        [Event(name="changed", type="flash.events.Event")]
+    </mx:Metadata>
+
+    <!--
+    Legend for a map, with editable legend items.
+
+    @author Peter Verweij
+    @author Rob Knapen
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.events.ListEvent;
+        import mx.events.ListEventReason;
+
+        [Bindable]
+        public var legendItemList: Classification;
+        [Bindable]
+        private var _editable: Boolean = false;
+
+        public function get editable(): Boolean
+        {
+            return _editable;
+        }
+
+        public function set editable(value: Boolean): void
+        {
+            _editable = value;
+
+            // update view state
+            if (_editable)
+                currentState = "";
+            else
+                currentState = "viewOnly";
+        }
+
+        private function endEdit(event: ListEvent): void
+        {
+            // Disable copying data back to the control.
+            event.preventDefault();
+
+            if (event.reason != ListEventReason.NEW_ROW)
+                return;
+
+            var editor:LegendElementEditor = event.currentTarget.itemEditorInstance;
+
+            var itm: LegendElement = editor.data as LegendElement;
+            itm.colour = editor.newColour;
+            if (itm is CategoryLegendElement)
+                CategoryLegendElement(itm).caption = editor.newCaption;
+            else if (itm is RangeLegendElement)
+                RangeLegendElement(itm).setRangeFromString(editor.newCaption);
+
+            // Close the cell editor.
+            listLegendElements.destroyItemEditor();
+
+            setChanged();
+        }
+
+        private function setChanged(): void
+        {
+            listLegendElements.invalidateList();
+
+            // dispatch change event
+            dispatchEvent(new Event("changed"));
+        }
+
+        public function addElement(): void
+        {
+            var obj: Object = legendItemList.addNew();
+            listLegendElements.selectedItem = obj;
+
+            setChanged();
+        }
+
+        public function removeElements(): void
+        {
+            var selectedIndices: Array = listLegendElements.selectedIndices;
+            for (var i: int = selectedIndices.length - 1; i >= 0; i--)
+                legendItemList.removeItemAt(selectedIndices[i]);
+
+            setChanged();
+        }
+			
+		]]>
+	</mx:Script>
+
+    <mx:List id="listLegendElements"
+             height="100%"
+             backgroundAlpha="0.5"
+             dataProvider="{legendItemList}"
+             itemRenderer="org.seamless_ip.ui.seampress.legend.LegendClassRenderer"
+             itemEditor="org.seamless_ip.ui.seampress.legend.LegendElementEditor"
+             itemEditEnd="endEdit(event)"
+             paddingBottom="2"
+             paddingLeft="2"
+             paddingRight="2"
+             paddingTop="2"
+             borderStyle="solid"
+             editorDataField="data"
+             doubleClickEnabled="true"
+             editable="{_editable}"
+             selectable="{_editable}" minWidth="170"
+            />
+    <mx:HBox width="100%" horizontalAlign="right" id="hbox1">
+        <mx:LinkButton id="addButton"
+                       width="32"
+                       label=""
+                       click="addElement()"
+                       toolTip="Add classification tot the legend"
+                       icon="@Embed('/img/icons/seamless-add.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-add-greyed.gif')"
+                />
+        <mx:LinkButton id="removeButton"
+                       width="32"
+                       label=""
+                       click="removeElements()"
+                       enabled="{listLegendElements.selectedItems.length > 0}"
+                       toolTip="Delete selected classification from the legend"
+                       icon="@Embed('/img/icons/seamless-delete.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-delete-greyed.gif')"
+                />
+    </mx:HBox>
+</mx:VBox>

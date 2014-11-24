@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: MapViewer.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+         width="100%" height="100%"
+         xmlns:ilog="http://www.ilog.com/2007/ilog/flex"
+         xmlns:ns="org.seamless_ip.ui.seampress.legend.*"
+        >
+
+    <mx:Metadata>
+        [Event(name="change")]
+    </mx:Metadata>
+
+    <!--
+	    Seam:PRESS component to visualise data in a map.
+
+	    @author Rob Knapen
+    -->
+    <mx:Script>
+		<![CDATA[
+        import ilog.maps.MapBase;
+
+        import ilog.maps.MapEvent;
+
+        import ilog.maps.MapFeature;
+
+        import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.graphics.SolidColor;
+
+        import org.seamless_ip.ui.seampress.legend.Classification;
+        import org.seamless_ip.ui.seampress.legend.DefaultRangeClassification;
+        import org.seamless_ip.ui.seampress.legend.LegendElement;
+        import org.seamless_ip.ui.seampress.maps.CountryAggregatesMap;
+        import org.seamless_ip.ui.seampress.maps.MemberstatesMap;
+        import org.seamless_ip.ui.seampress.maps.SeamNUTSMap;
+
+        [Bindable]
+        public var experiments:ArrayCollection = new ArrayCollection();
+        [Bindable]
+        private var classification:Classification;
+
+        private const helpText:String = "Use the mouse, or the + and - keys to zoom, and arrow keys to pan the map.";
+
+        private var map:MapBase;
+        private var visualisation:Visualisation;
+        private var values:IndicatorValues;
+
+        private var mapValues:ArrayCollection;
+        private var mapFeatureKey:String;
+        private var mapLabelKey:String;
+        private var mapValueKey:String = "Calculated";
+
+
+        public function update(visualisation:Visualisation, values:IndicatorValues):void {
+            this.visualisation = visualisation;
+            this.values = values;
+
+            var indTitles:ArrayCollection = values.getTitles(IndicatorValues.INDICATOR_TITLE, visualisation.indicatorIds);
+            comboBoxIndicators.dataProvider = indTitles; // object:{id, label}
+
+            var expTitles:ArrayCollection = values.getTitles(IndicatorValues.EXPERIMENT_TITLE, visualisation.experimentIds);
+            comboBoxExperiments.dataProvider = expTitles; // object:{id, label}
+
+            var valueTypes:ArrayCollection = ValueType.values;
+            comboBoxValueTypes.dataProvider = valueTypes;
+
+            refresh();
+        }
+
+
+        public function save():void {
+            if ((visualisation != null) && (classification != null)) {
+                var xml:XML = classification.toXml();
+                visualisation.properties["classification"] = xml.toString();
+                changed();
+            }
+        }
+
+
+        public function discard():void {
+            if ((visualisation != null) && (classification != null)) {
+                if (visualisation.properties.hasOwnProperty("classification")) {
+                    var str:String = visualisation.properties["classification"];
+                    var xml:XML = new XML(str);
+                    classification.assignFromXml(xml);
+                    updateMapColours(classification, mapValues, mapFeatureKey, mapLabelKey, mapValueKey);
+                }
+            }
+        }
+
+
+        private function changed(event:Event = null):void {
+            dispatchEvent(new Event("change"));
+        }
+
+
+        private function refresh():void {
+            if ((visualisation != null) && (values != null)) {
+
+                var indicatorId:String = String(comboBoxIndicators.selectedItem.id);
+                var experimentId:String = String(comboBoxExperiments.selectedItem.id);
+                var experimentIds:ArrayCollection = new ArrayCollection();
+                experimentIds.addItem(experimentId);
+
+                mapValues = values.createDataProvider(
+                        experimentIds,
+                        indicatorId,
+                        ValueType(comboBoxValueTypes.selectedItem),
+                        false,
+                        true
+                        );
+
+                mapContainer.removeAllChildren();
+                if (map != null) {
+                    map.removeEventListener(MapEvent.ITEM_ROLL_OVER, mapItemRollOver);
+                    map.removeEventListener(MapEvent.ITEM_ROLL_OUT, mapItemRollOut);
+                }
+                map = null;
+
+                var minValue:Number = Number.MAX_VALUE;
+                var maxValue:Number = Number.MIN_VALUE;
+
+                // search for map feature references
+                for each (var value:Object in mapValues) {
+                    if (map == null) {
+                        // NUTS2:
+                        if (value.hasOwnProperty("Region.MapFeatureId")) {
+                            map = new SeamNUTSMap();
+                            map.toolTip = "NUTS 2 Regions";
+                            mapFeatureKey = "Region.MapFeatureId";
+                            mapLabelKey = "Region.Name";
+                        }
+                        // Memberstates:
+                        if (value.hasOwnProperty("Country.MapFeatureId")) {
+                            map = new MemberstatesMap();
+                            map.toolTip = "Member states";
+                            mapFeatureKey = "Country.MapFeatureId";
+                            mapLabelKey = "Country.Name";
+                        }
+                        // Country aggregates:
+                        if (value.hasOwnProperty("CountryAggregate.MapFeatureId")) {
+                            map = new CountryAggregatesMap();
+                            map.toolTip = "Country aggregates";
+                            mapFeatureKey = "CountryAggregate.MapFeatureId"
+                            mapLabelKey = "CountryAggregate.Name";
+                        }
+                        // What type of map?:
+                        // AgriEnvironmentalZone.MapFeatureId
+                        // 		only available for three sample regions...
+                        // ToCountryAggregate.MapFeatureId
+                        // FromCountryAggregate.MapFeatureId
+                    }
+
+                    // find the min and max values
+                    if (value.hasOwnProperty(mapValueKey)) {
+                        if (value[mapValueKey] < minValue)
+                            minValue = value[mapValueKey];
+                        if (value[mapValueKey] > maxValue)
+                            maxValue = value[mapValueKey];
+                    }
+                }
+
+                if (map == null) {
+                    Alert.show("Data contains no spatial references and can not be displayed on a map!", "Can not create map");
+                } else {
+                    map.percentWidth = 100;
+                    map.percentHeight = 100;
+                    map.alpha = 1;
+                    map.setStyle(MapBase.BACKGROUND_FILL, 0xFFFFFF);
+                    map.allowNavigation = true;
+                    mapContainer.addChildAt(map, 0);
+
+                    map.addEventListener(MapEvent.ITEM_ROLL_OVER, mapItemRollOver);
+                    map.addEventListener(MapEvent.ITEM_ROLL_OUT, mapItemRollOut);
+
+                    // create a default classification with default colour ramp
+                    classification = new DefaultRangeClassification(minValue, maxValue);
+
+                    // check for stored classification
+                    if (visualisation.properties.hasOwnProperty("classification")) {
+                        var str:String = visualisation.properties["classification"];
+                        var xml:XML = new XML(str);
+                        classification.assignFromXml(xml);
+                    }
+
+                    updateMapColours(classification, mapValues, mapFeatureKey, mapLabelKey, mapValueKey);
+                }
+            }
+        }
+
+
+        private function mapItemRollOver(event:MapEvent):void {
+            var mf:MapFeature = event.mapFeature;
+            if (mf != null) {
+                mapFeatureLabel.text = mf.toolTip;
+            } else {
+                mapFeatureLabel.text = helpText;
+            }
+        }
+
+
+        private function mapItemRollOut(event:MapEvent):void {
+            mapFeatureLabel.text = helpText;
+            map.toolTip = "";
+        }
+
+
+        /**
+         * values is an array of objects with 'key' and 'value' members
+         */
+        private function updateMapColours(classification:Classification, values:ArrayCollection,
+                                          mapFeatureKey:String, mapLabelKey:String, mapValueKey:String
+                ):void {
+            var value:Number;
+            if (map != null) {
+                for each (var mf:MapFeature in map.mapFeatures) {
+                    for each (var obj:Object in values) {
+                        if (mf.key == obj[mapFeatureKey]) {
+                            value = obj[mapValueKey];
+                            mf.toolTip = obj[mapLabelKey] + " (" + mf.key + "), Value = " + value;
+                            var element:LegendElement = classification.findItemForValue(value);
+                            if (element != null)
+                                mf.setStyle(MapBase.FILL, new SolidColor(element.colour));
+                        }
+                    }
+                }
+            }
+        }
+
+
+        private function legendUpdated(): void {
+            updateMapColours(classification, mapValues, mapFeatureKey, mapLabelKey, mapValueKey);
+        }
+			
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:VBox width="100%"
+             horizontalAlign="center" verticalAlign="middle"
+             borderStyle="solid" cornerRadius="10"
+             horizontalGap="4"
+             paddingLeft="10" paddingRight="10"
+             paddingTop="5" paddingBottom="5"
+             backgroundAlpha="0.5" backgroundColor="#FCFBD9">
+        <mx:HBox width="100%" verticalAlign="middle">
+            <mx:Label text="Experiment:" width="100" textAlign="right" fontWeight="bold"/>
+            <mx:ComboBox id="comboBoxExperiments"
+                         change="refresh()"
+                         width="100%"
+                    />
+        </mx:HBox>
+        <mx:HBox width="100%" verticalAlign="middle">
+            <mx:Label text="Indicator:" width="100" textAlign="right" fontWeight="bold"/>
+            <mx:ComboBox id="comboBoxIndicators"
+                         change="refresh()"
+                         width="100%"
+                    />
+            <mx:ComboBox id="comboBoxValueTypes"
+                         change="refresh()"
+                    />
+        </mx:HBox>
+    </mx:VBox>
+
+    <mx:HBox width="100%" height="100%"
+             horizontalAlign="center" verticalAlign="middle"
+             borderStyle="solid" cornerRadius="10"
+             horizontalGap="4"
+             paddingLeft="10" paddingRight="10"
+             paddingTop="5" paddingBottom="5"
+             backgroundAlpha="0.5" backgroundColor="#FCFBD9">
+        <mx:VBox id="mapContainer"
+                 width="100%" height="100%"
+                />
+        <mx:VBox height="100%">
+            <mx:HBox width="100%" verticalAlign="middle" verticalGap="4" horizontalGap="0">
+                <mx:Label text="Legend:" fontWeight="bold"/>
+                <mx:Spacer width="100%"/>
+                <mx:LinkButton id="buttonSaveLegend"
+                               width="32"
+                               label=""
+                               click="save()"
+                               icon="@Embed('/img/icons/seamless-save.gif')"
+                               disabledIcon="@Embed('/img/icons/seamless-save-greyed.gif')"
+                        />
+                <mx:LinkButton id="buttonDiscardChanges"
+                               width="32"
+                               label=""
+                               click="discard()"
+                               icon="@Embed('/img/icons/seamless-undo.gif')"
+                               disabledIcon="@Embed('/img/icons/seamless-undo-greyed.gif')"
+                        />
+            </mx:HBox>
+            <ns:Legend legendItemList="{classification}"
+                       editable="true"
+                       changed="legendUpdated()"
+                       height="100%"/>
+        </mx:VBox>
+    </mx:HBox>
+    <mx:HBox width="100%" horizontalAlign="center">
+        <mx:Label id="mapFeatureLabel" text="{helpText}"/>
+    </mx:HBox>
+
+</mx:VBox>

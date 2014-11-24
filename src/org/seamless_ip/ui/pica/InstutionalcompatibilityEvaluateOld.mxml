@@ -1,0 +1,486 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: InstutionalcompatibilityEvaluateOld.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml"
+          layout="vertical" width="100%" height="100%"
+          xmlns:ns="org.seamless_ip.ui.common.*"
+          creationComplete="{init()}">
+
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.managers.PopUpManager;
+
+        import org.seamless_ip.services.transferobjects.pica.CrucialInstitutionalAspect;
+        import org.seamless_ip.services.transferobjects.pica.InstitutionalCompatibility;
+        import org.seamless_ip.services.transferobjects.pica.NaturalResourceFocus;
+        import org.seamless_ip.services.transferobjects.pica.PICAIndicatorGeneral;
+        import org.seamless_ip.services.transferobjects.pica.PICASpatialLevel;
+        import org.seamless_ip.services.transferobjects.pica.PICAassessment;
+        import org.seamless_ip.services.transferobjects.pica.PolicyType;
+        import org.seamless_ip.services.transferobjects.pica.PropertyRightsChanges;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        // User
+        private var _user:User;
+
+        [Bindable]
+        public function get user():User {
+            return _user;
+        }
+
+        public function set user(user:User):void {
+            _user = user;
+        }
+
+        // PicaIndicatorGeneral
+
+
+        [Bindable]
+        public var instName:String = "No name";
+
+        private var _institutionalCompatibility:InstitutionalCompatibility = null;
+
+        private function init():void {
+
+        }
+
+        public function filterCIAs(obj:Object):Boolean {
+            return (obj as CrucialInstitutionalAspect).selected;
+        }
+
+        public function set institutionalCompatibility(institutionalCompatibility:InstitutionalCompatibility):void {
+            _institutionalCompatibility = institutionalCompatibility;
+
+        }
+
+
+        [Bindable]
+        public function get institutionalCompatibility():InstitutionalCompatibility {
+            return _institutionalCompatibility;
+        }
+
+        [Bindable ]
+        public var picaService:PicaService;
+
+        [Bindable]
+        public var cIAS:ArrayCollection = null;
+
+
+        private var _pICAIndicatorGeneral:ArrayCollection = null;
+
+        [Bindable]
+        public function get pICAIndicatorGeneral():ArrayCollection {
+            return _pICAIndicatorGeneral;
+        }
+
+        public function set pICAIndicatorGeneral(picaIndicatorGeneral :ArrayCollection):void {
+            _pICAIndicatorGeneral = picaIndicatorGeneral;
+        }
+
+        [Bindable]
+        public var pICASpatialLevel:ArrayCollection = null;
+
+
+        private function ciaChanged(event:Event):void {
+            Alert.show(event.toString());
+        }
+
+        private function discard(event:MouseEvent):void {
+            dispatchEvent(new PicaEvent(PicaEvent.CHANGEVIEWINSTS));
+        }
+
+
+        private function save(event:MouseEvent):void {
+
+            var picaE:PicaEvent = new PicaEvent(PicaEvent.CHANGEVIEWINSTS);
+            picaE.institutionalCompatibility = _institutionalCompatibility;
+            dispatchEvent(picaE);
+        }
+
+        private function saveIndicators():void {
+
+        }
+
+        private function saveCIAs():void {
+
+        }
+
+        public function RequestSaveSpatialScale(event:PicaEvent): void {
+            var found:Boolean = false;
+
+            for (var i:int = 0; i < pICASpatialLevel.length; i++) {
+                var pSL:PICASpatialLevel = pICASpatialLevel.getItemAt(i) as PICASpatialLevel;
+                if (event.picaspatiallevel.id == pSL.id) {
+                    pSL = event.picaspatiallevel;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                pICASpatialLevel.addItem(event.picaspatiallevel);
+            }
+
+            picaService.updatePICASpatialLevels(event.picaspatiallevel);
+
+        }
+
+        public function instCompPicaIndicatorGeneralHandler(event:PicaEvent):void {
+            for each(var picaIndicatorG:PICAIndicatorGeneral in picaService.instCompPICAIndicatorGeneral) {
+                for each (var picaIndicatorG2:PICAIndicatorGeneral in pICAIndicatorGeneral) {
+                    if (picaIndicatorG.id == picaIndicatorG2.id) {
+                        picaIndicatorG2.selected = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        public function newSpatialScaleHandler(event:PicaEvent):void {
+            spatiallevelfrm.spatialLevel = picaService.newPicaSpatialLevel;
+            PopUpManager.addPopUp(spatiallevelfrm, this, true);
+            PopUpManager.centerPopUp(spatiallevelfrm);
+        }
+
+        private var spatiallevelfrm:SpatialLevelFrm;
+
+        private function addNewSpatialScale():void {
+            picaService.createPICASpatialLevel(parseInt(institutionalCompatibility.id));
+
+        }
+
+        // Why is this not fired??
+        private function tabIndexChanged(event:Event):void {
+
+        }
+
+
+        public function onEditSpatial(avEvent :Event, avData  :Object):void
+        {
+            for (var i:int; i < pICASpatialLevel.length; i++) {
+                if (avData == pICASpatialLevel.getItemAt(i)) {
+                    spatiallevelfrm.isEditing = true;
+                    PopUpManager.addPopUp(spatiallevelfrm, this, true);
+                    PopUpManager.centerPopUp(spatiallevelfrm);
+                    spatiallevelfrm.spatialLevel = (PICASpatialLevel)(avData);
+                    break;
+                }
+            }
+        }
+
+        public function onDeleteSpatial(avEvent :Event, avData  :Object):void
+        {
+            for (var i:int = 0; i < pICASpatialLevel.length; i++) {
+                if (avData == pICASpatialLevel.getItemAt(i)) {
+
+                    picaService.deletePICASpatialLevel(
+                            parseInt((avData as PICASpatialLevel).id));
+                    pICASpatialLevel.removeItemAt(i);
+                    break;
+                }
+            }
+        }
+
+        private function labelNaturalResource(item:Object, column:DataGridColumn):String {
+            var pI:PICAIndicatorGeneral = (item as PICAIndicatorGeneral);
+
+            return "";
+
+            // new PICAassessment().
+
+        }
+
+        private function labelPropertyRightsChanges(item:Object, column:DataGridColumn):String {
+            var pI:PICAIndicatorGeneral = (item as PICAIndicatorGeneral);
+
+            return "";
+        }
+
+        private function labelPolicyTypes(item:Object, column:DataGridColumn):String {
+            var pI:PICAIndicatorGeneral = (item as PICAIndicatorGeneral);
+
+            return "";
+        }
+
+        private function indicatorColor(item:Object, color:uint):uint
+        {
+            var pI:PICAIndicatorGeneral = (item as PICAIndicatorGeneral);
+
+            for each (var cIA:CrucialInstitutionalAspect in cIAS) {
+                if (pI.mainCrucialInstitutionalAspect.id == cIA.id) {
+                    return Colors.rgba(150, 0, 0);
+                }
+            }
+
+            return color;
+        }
+
+        private function ciaColor(item:Object, color:uint):uint
+        {
+            var cIA:CrucialInstitutionalAspect = (item as CrucialInstitutionalAspect);
+
+
+            for each (var indG:PICAIndicatorGeneral in cIA.suitableIndicators) {
+                for each (var indG2:PICAIndicatorGeneral in pICAIndicatorGeneral) {
+                    if (indG.id == indG2.id) {
+                        return Colors.rgba(150, 0, 0);
+                    }
+                }
+            }
+            return color;
+        }
+
+        private function ciaLabel(item:Object, column:DataGridColumn):String
+        {
+            var cIA:CrucialInstitutionalAspect = (item as CrucialInstitutionalAspect);
+            var ret:String = "";
+
+
+            for each (var nat:NaturalResourceFocus in cIA.naturalResourceFoci) {
+                if (_institutionalCompatibility.naturalResourceFocus.id == nat.id) {
+                    ret = "nat";
+                    break;
+                }
+            }
+
+            for each (var pro:PropertyRightsChanges in cIA.propertyRightsChanges) {
+                if (_institutionalCompatibility.propertyRightsChange.id == pro.id) {
+                    if (ret.length != 0) {
+                        ret += ", ";
+                    }
+                    ret += "pro";
+                    break;
+                }
+            }
+
+            for each (var pol:PolicyType in cIA.policyTypes) {
+                if (_institutionalCompatibility.policyType.id == pol.id) {
+                    if (ret.length != 0) {
+                        ret += ", ";
+                    }
+                    ret += "pol";
+                    break;
+                }
+            }
+
+            return ret;
+        }
+
+        public function onTheme(avEvent :Event, avData  :Object):void
+        {
+            var lCIA:CrucialInstitutionalAspect = (avData as CrucialInstitutionalAspect);
+            if (!lCIA.selected) {
+                Alert.show("This CIA is not selected!");
+                return;
+            }
+            var found:Boolean = false;
+            var assessment:PICAassessment = null;
+            for each (var pA:PICAassessment in institutionalCompatibility.PICACIAThemes) {
+                if (pA.crucialInstitutionalAspect.id == lCIA.id) {
+                    assessment = pA;
+                    found = true
+                    break;
+                }
+            }
+            if (!found) {
+                assessment = new PICAassessment();
+                institutionalCompatibility.PICACIAThemes.addItem(assessment);
+            }
+            picaTheme._pICAassessment = assessment;
+            PopUpManager.addPopUp(picaTheme, this, true);
+            PopUpManager.centerPopUp(picaTheme);
+        }
+
+        public var picaTheme:PicaTheme = new PicaTheme();
+		
+		]]>
+	</mx:Script>
+    <mx:HBox width="100%">
+        <mx:HBox horizontalAlign="left" verticalAlign="bottom">
+            <mx:Label text="{instName}"/>
+        </mx:HBox>
+
+        <mx:HBox width="100%" horizontalAlign="right" verticalAlign="bottom">
+            <mx:Button label="Discard"
+                       toolTip="Discard all changes"
+                       click="{discard(event)}"
+                       disabledIcon="@Embed('/img/icons/delete_edit_d.gif')"
+                       icon="@Embed('/img/icons/delete_edit.gif')"/>
+            <mx:Button label="Save"
+                       id="btnSave"
+                       toolTip="Save and return to Instutional compabilities"
+                       click="{save(event)}"
+                       disabledIcon="@Embed('/img/icons/save_edit_d.gif')"
+                       icon="@Embed('/img/icons/save_edit.gif')"/>
+        </mx:HBox>
+    </mx:HBox>
+    <mx:ViewStack id="viewstackMain" width="100%" height="100%">
+        <mx:Panel label="A" height="100%">
+            <mx:TabBar width="100%" dataProvider="{viewstackSubA}" tabIndexChange="{tabIndexChanged(event)}">
+            </mx:TabBar>
+            <mx:ViewStack id="viewstackSubA" width="100%" height="100%">
+                <!-- Spatial level -->
+                <mx:Panel label="Spatial level"
+                          layout="vertical" width="100%" height="100%"
+                        >
+
+                    <ns:DataGridRowColor id="gridSpatialScale"
+                                         width="100%" height="100%"
+                                         dataProvider="{pICASpatialLevel}"
+                                         variableRowHeight="true">
+                        <ns:columns>
+                            <mx:DataGridColumn headerText=""
+                                               dataField="selected" width="20"
+                                               editable="false"
+                                               sortable="false"
+                                               visible="false"
+                                               itemRenderer="org.seamless_ip.ui.experimentdesigner.CheckboxRenderer"/>
+
+                            <mx:DataGridColumn headerText="Name" dataField="name"/>
+                            <mx:DataGridColumn headerText="Classification" dataField="classification"/>
+                            <mx:DataGridColumn headerText="Description" dataField="description" wordWrap="true"/>
+                            <mx:DataGridColumn editable="false" width="60">
+                                <mx:itemRenderer>
+                                    <mx:Component>
+                                        <mx:HBox>
+                                            <mx:Button label="Edit" click="outerDocument.onEditSpatial( event, data )"/>
+                                        </mx:HBox>
+                                    </mx:Component>
+                                </mx:itemRenderer>
+                            </mx:DataGridColumn>
+                            <mx:DataGridColumn editable="false" width="80">
+                                <mx:itemRenderer>
+                                    <mx:Component>
+                                        <mx:HBox>
+                                            <mx:Button label="Delete"
+                                                       click="outerDocument.onDeleteSpatial( event, data )"/>
+                                        </mx:HBox>
+                                    </mx:Component>
+                                </mx:itemRenderer>
+                            </mx:DataGridColumn>
+                        </ns:columns>
+                    </ns:DataGridRowColor>
+                    <mx:HBox width="100%" horizontalAlign="right" verticalAlign="bottom">
+                        <mx:Button label="Add new"
+                                   toolTip=""
+                                   click="{addNewSpatialScale()}"
+                                   disabledIcon="@Embed('/img/icons/add_obj.gif')"
+                                   icon="@Embed('/img/icons/add_obj.gif')" enabled="true"
+                                />
+                    </mx:HBox>
+
+                </mx:Panel>
+
+                <mx:Panel layout="vertical" label="CIA's" width="100%" height="100%">
+                    <ns:DataGridRowColor id="gridCIA" width="100%" height="100%"
+                                         dataProvider="{cIAS}" variableRowHeight="true"
+                                         rowColorFunction="{ciaColor}">
+                        <ns:columns>
+                            <mx:DataGridColumn headerText=""
+                                               id="isSelected"
+                                               dataField="selected" width="20"
+                                               editable="false"
+                                               sortable="false"
+                                               itemRenderer="org.seamless_ip.ui.experimentdesigner.CheckboxRenderer"/>
+
+                            <mx:DataGridColumn headerText="Name" dataField="name"/>
+                            <mx:DataGridColumn headerText="Description" dataField="description" wordWrap="true"/>
+                            <mx:DataGridColumn headerText="R" labelFunction="{ciaLabel}"/>
+                            <mx:DataGridColumn headerText="Weblink" dataField="weblink"/>
+                            <mx:DataGridColumn editable="false" width="80">
+                                <mx:itemRenderer>
+                                    <mx:Component>
+                                        <mx:HBox>
+                                            <mx:Button label="Theme" click="outerDocument.onTheme( event, data )"/>
+                                        </mx:HBox>
+                                    </mx:Component>
+                                </mx:itemRenderer>
+                            </mx:DataGridColumn>
+
+                        </ns:columns>
+                    </ns:DataGridRowColor>
+                    <mx:HBox width="100%" horizontalAlign="right" verticalAlign="bottom">
+                        <mx:Button label="Add new"
+                                   toolTip=""
+
+                                   disabledIcon="@Embed('/img/icons/add_obj.gif')"
+                                   icon="@Embed('/img/icons/add_obj.gif')" id="addNewCIA" enabled="false"/>
+                        <mx:Button label="Save"
+                                   id="btnSaveCIA"
+                                   toolTip="Save all changes"
+                                   click="{saveCIAs()}"
+                                   disabledIcon="@Embed('/img/icons/save_edit_d.gif')"
+                                   icon="@Embed('/img/icons/save_edit.gif')"/>
+                    </mx:HBox>
+                </mx:Panel>
+
+
+                <mx:Panel label="Indicators"
+                          layout="vertical"
+                          width="100%" height="100%">
+                    <ns:DataGridRowColor id="gridIndicators" width="100%" height="100%"
+                                         dataProvider="{pICAIndicatorGeneral}"
+                                         variableRowHeight="true"
+                                         rowColorFunction="indicatorColor">
+                        <ns:columns>
+                            <mx:DataGridColumn headerText=""
+                                               dataField="selected" width="20"
+                                               editable="false"
+                                               sortable="false"
+                                               itemRenderer="org.seamless_ip.ui.experimentdesigner.CheckboxRenderer"/>
+
+                            <mx:DataGridColumn headerText="Name" dataField="name"/>
+                            <mx:DataGridColumn headerText="Description" dataField="description"
+                                               wordWrap="true"/>
+                            <mx:DataGridColumn headerText="Unit" dataField="unit"/>
+                        </ns:columns>
+                    </ns:DataGridRowColor>
+                    <mx:HBox width="100%" horizontalAlign="right" verticalAlign="bottom">
+                        <mx:Button label="Add new"
+                                   toolTip=""
+
+                                   disabledIcon="@Embed('/img/icons/add_obj.gif')"
+                                   icon="@Embed('/img/icons/add_obj.gif')" id="addNewCIA0" enabled="false"/>
+                        <mx:Button label="Save"
+                                   id="btnSaveIndicators"
+                                   toolTip="Save all changes"
+                                   click="{saveIndicators()}"
+                                   disabledIcon="@Embed('/img/icons/save_edit_d.gif')"
+                                   icon="@Embed('/img/icons/save_edit.gif')"/>
+                    </mx:HBox>
+
+                </mx:Panel>
+            </mx:ViewStack>
+        </mx:Panel>
+    </mx:ViewStack>
+</mx:Panel>

@@ -1,0 +1,20 @@
+<!--
+	build-assets.xml 
+	===========================================================================
+	Assets exported by this project to others.
+
+	These Flex build files are based on the Antennae open source project, for
+	more information please see the build files in the tools folder.
+	===========================================================================
+	This work has been carried out as part of the SEAMLESS Integrated Framework
+	project, EU 6th Framework Programme, contract no. 010036-2.
+
+	Copyright (c) 2008 The SEAMLESS project. All rights reserved.
+	
+	For more information: www.seamless-ip.org; email: seamless.office@wur.nl
+	===========================================================================
+	Author : Rob Knapen
+	===========================================================================
+-->
+<project name="wallace.assets">
+</project>

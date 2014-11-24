@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: NewProjectDialog.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<SizeableTitleWindow
+        xmlns:mx="http://www.adobe.com/2006/mxml"
+        xmlns="org.seamless_ip.ui.common.*"
+        layout="vertical"
+        width="700"
+        height="450"
+        title="New Project"
+        showCloseButton="true"
+        borderAlpha="0.8"
+        borderColor="#e2d4b3"
+        cornerRadius="10"
+        backgroundColor="#e2d4b3"
+        creationComplete="init()"
+        >
+
+
+    <mx:Metadata>
+        [Event(name="projectCreate", type="org.seamless_ip.ui.projects.ProjectEvent")]
+    </mx:Metadata>
+
+    <!--
+    Dialog box to input initial properties for a new project.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.events.ValidationResultEvent;
+        import mx.managers.PopUpManager;
+
+        import org.seamless_ip.services.transferobjects.seamproj.ModelChain;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.SpatialScale;
+        import org.seamless_ip.ui.enums.EnumClassName;
+        import org.seamless_ip.ui.enums.EnumManager;
+
+        // list of available spatial scales
+        [Bindable]
+        private var _spatialScales:ArrayCollection;
+        // list of available model chains
+        [Bindable]
+        private var _modelChains:ArrayCollection;
+
+
+        /**
+         * Initialises the component, called when creation is complete.
+         */
+        private function init():void {
+            addEventListener('close', closeMe);
+
+            // get the enumerations for the comboboxes
+            _spatialScales = EnumManager.instance.getEnumValues(EnumClassName.SPATIAL_SCALE);
+            _modelChains = EnumManager.instance.getEnumValues(EnumClassName.MODELCHAIN);
+
+            // make sure the comboboxes are in sync
+            spatialScaleSelected();
+        }
+
+
+        /**
+         * Updates the selected model chain to one that matches the
+         * selected spatial scale, if possible.
+         */
+        private function spatialScaleSelected():void {
+            var found:Boolean = false;
+            errorLabel.text = "";
+
+            // update the model chain combo box
+            for each (var item:ModelChain in _modelChains) {
+                if (item.spatialScale.id == comboBoxSpatialScale.selectedItem.id) {
+                    comboBoxModelChain.selectedItem = item;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+                errorLabel.text = "No model chain available to calculate at the selected spatial scale!";
+        }
+
+
+        /**
+         * Updates the selected spatial scale to one that matches the
+         * selected model chain, if possible.
+         */
+        private function modelChainSelected():void {
+            var found:Boolean = false;
+            errorLabel.text = "";
+
+            // update the spatial scale combo box
+            for each (var item:SpatialScale in _spatialScales) {
+                if (item.id == comboBoxModelChain.selectedItem.spatialScale.id) {
+                    comboBoxSpatialScale.selectedItem = item;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+                errorLabel.text = "Spatial scale not clear for selected model chain (internal problem)!";
+        }
+
+
+        /**
+         * Validates the input in the form and dispatches an event with
+         * the project data. Listeners to this event can use it to
+         * create the new project.
+         */
+        private function submit():void {
+            if (isValid()) {
+                var project:Project = new Project();
+                project.title = titleTextInput.text;
+                project.description = descriptionTextArea.text;
+                project.problem.spatialScale = SpatialScale(comboBoxSpatialScale.selectedItem);
+
+                var evt:ProjectEvent = new ProjectEvent(ProjectEvent.PROJECT_CREATE, project);
+                dispatchEvent(evt);
+
+                PopUpManager.removePopUp(this);
+            }
+        }
+
+
+        /**
+         * Checks if the input in the dialog is valid or not.
+         *
+         * @return true when all input is valid
+         */
+        private function isValid():Boolean {
+            var evt:ValidationResultEvent = validator.validate();
+            if (evt.type == ValidationResultEvent.INVALID) {
+                errorLabel.text = evt.message;
+                return false;
+            }
+
+            errorLabel.text = "";
+            return true;
+        }
+
+
+        /**
+         * Closes the dialog.
+         */
+        private function closeMe(event:Event):void {
+            PopUpManager.removePopUp(this);
+        }
+		]]>
+	</mx:Script>
+
+
+    <!--
+     ===========================================================================
+         Validators
+     ===========================================================================
+     -->
+
+    <mx:StringValidator id="validator"
+                        source="{titleTextInput}" property="text"
+                        requiredFieldError="A title must be specified"
+            />
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:Form width="100%" height="100%" alpha="0.5" backgroundColor="#ffffff">
+        <mx:FormHeading label="Project Details"/>
+        <mx:FormItem label="Title:" width="100%" required="true">
+            <mx:TextInput id="titleTextInput" width="100%"/>
+        </mx:FormItem>
+        <mx:FormItem label="Description:" width="100%" height="100%">
+            <mx:TextArea id="descriptionTextArea"
+                         width="100%" height="100%"/>
+        </mx:FormItem>
+
+        <mx:FormItem width="100%">
+            <mx:Label width="100%" truncateToFit="true"
+                      text="Choose either spatial scale or model chain for the analysis:"
+                      enabled="false"
+                    />
+        </mx:FormItem>
+
+        <mx:FormItem label="Spatial Scale:" width="100%">
+            <mx:ComboBox id="comboBoxSpatialScale"
+                         enabled="true"
+                         dataProvider="{_spatialScales}"
+                         change="spatialScaleSelected()"
+                         labelField="label"
+                         selectedIndex="0"
+                         width="100%"
+                         toolTip="Spatial scale of the analysis. The finest unit of analysis is displayed in square brackets. Choice of scale determines appropriate model chain."
+                    />
+        </mx:FormItem>
+
+        <mx:FormItem label="Model Chain:" width="100%">
+            <mx:ComboBox id="comboBoxModelChain"
+                         enabled="true"
+                         dataProvider="{_modelChains}"
+                         change="modelChainSelected()"
+                         labelField="label"
+                         selectedIndex="0"
+                         width="100%"
+                         toolTip="Model chain used in the analysis. The choice of model chain determines the spatial scale of the analysis (with finest unit of analysis in square brackets)."
+                    />
+        </mx:FormItem>
+
+        <mx:FormItem width="100%">
+            <mx:Label id="errorLabel" width="100%" textAlign="left" color="#ff0000"/>
+        </mx:FormItem>
+        <mx:FormItem width="100%" height="5">
+            <mx:Spacer width="100%" height="100%"/>
+        </mx:FormItem>
+        <mx:FormItem width="100%">
+            <mx:HBox width="100%" horizontalAlign="center" verticalAlign="middle">
+                <mx:Button id="okButton"
+                           label="OK" width="100"
+                           toolTip="Continue with creating the project"
+                           click="submit()"
+                           icon="@Embed('/img/icons/redo_edit.gif')"/>
+                <mx:Spacer width="100%" height="10"/>
+                <mx:Button id="cancelButton"
+                           label="Cancel" width="100"
+                           toolTip="Cancel the creation of the project"
+                           click="closeMe(event)"
+                           icon="@Embed('/img/icons/delete_edit.gif')"/>
+            </mx:HBox>
+        </mx:FormItem>
+    </mx:Form>
+
+</SizeableTitleWindow>

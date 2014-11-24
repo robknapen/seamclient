@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: TableViewer.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%">
+
+    <!--
+        Seam:PRESS component to visualise data in a table.
+
+        @author Rob Knapen
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.controls.dataGridClasses.DataGridColumn;
+
+        [Bindable]
+        private var visualisation:Visualisation;
+        [Bindable]
+        private var values:IndicatorValues;
+
+
+        public function update(visualisation:Visualisation, values:IndicatorValues):void {
+            this.visualisation = visualisation;
+            this.values = values;
+
+            var indTitles:ArrayCollection = values.getTitles(IndicatorValues.INDICATOR_TITLE, visualisation.indicatorIds);
+            comboBoxIndicators.dataProvider = indTitles; // object:{id, label}
+
+            var valueTypes:ArrayCollection = ValueType.values;
+            comboBoxValueTypes.dataProvider = valueTypes;
+
+            refresh();
+        }
+
+
+        private function refresh():void {
+            if ((visualisation != null) && (values != null)) {
+
+                var indicatorId:String = String(comboBoxIndicators.selectedItem.id);
+
+                var data:ArrayCollection = values.createDataProvider(
+                        visualisation.experimentIds,
+                        indicatorId,
+                        ValueType(comboBoxValueTypes.selectedItem),
+                        checkBoxMergeData.selected,
+                        checkBoxShowInternalFields.selected
+                        );
+
+                if (data.length > 0) {
+                    // create table columns
+                    var columns:Array = valuesDataGrid.columns;
+                    var dgc:DataGridColumn;
+                    var value:Object = data[0];
+
+                    columns.length = 0;
+
+					var sortedKeys:ArrayCollection = getSortedProperties(value);
+					var key:String;
+					for (var index:int = 0; index < sortedKeys.length; index++) {
+						key = sortedKeys.getItemAt(index).toString();
+                        dgc = new DataGridColumn();
+                        dgc.dataField = key;
+                        dgc.labelFunction = labelFunction;
+                        dgc.headerWordWrap = true;
+                        dgc.setStyle("headerStyleName", "left");
+                        columns.push(dgc);
+                    }
+
+                    valuesDataGrid.columns = columns;
+                }
+
+                valuesDataGrid.dataProvider = data;
+                valuesDataGrid.invalidateDisplayList();
+            }
+        }
+      
+      
+      	private function labelFunction(item:Object, column:DataGridColumn):String {
+      		if (item[column.dataField] is Number) {
+      			column.setStyle("textAlign", "right");
+      			return numberFormatter.format(item[column.dataField]);
+      		}
+      		return item[column.dataField];
+      	}  
+        
+        
+		/**
+		 * Examines the properties of the specified object and returns a
+		 * list of property keys, sorted for table display purposes. In
+		 * general it will first list indicator properties (with ":" in the
+		 * name), followed by properties called "baseline" and "calculated",
+		 * and then all the rest.  
+		 */
+        private function getSortedProperties(obj:Object):ArrayCollection {
+        	var key:String;
+        	var result:ArrayCollection = new ArrayCollection();
+        	
+        	// list "experiment" first
+        	for (key in obj) {
+        		if (key.toLowerCase() == "experiment") {
+					result.addItem(key);        			
+        		}
+        	}
+        	// list names and ids
+        	for (key in obj) {
+        		if ((key.toLowerCase().indexOf(":name") >= 0) || (key.toLowerCase().indexOf(":id") >= 0)) {
+					result.addItem(key);        			
+        		}
+        	}
+        	// list all other properties (with ":" in the name, followed by a character)
+        	for (key in obj) {
+        		if (!result.contains(key)) {
+        			var pos:int = key.indexOf(":");
+        			if ((pos >= 0) && (pos < key.length - 1) && (key.charAt(pos+1).toLowerCase() >= "a")) {
+        				result.addItem(key);
+        			}
+        		}
+        	}
+        	// add "baseline" next
+        	for (key in obj) {
+        		if ((key.toLowerCase().indexOf("baseline") >= 0) && (!result.contains(key))) {
+					result.addItem(key);
+        		}
+        	}
+        	// add "calculated" next
+        	for (key in obj) {
+        		if ((key.toLowerCase().indexOf("calculated") >= 0) && (!result.contains(key))) {
+					result.addItem(key);
+        		}
+        	}
+        	// add all remaining properties
+        	for (key in obj) {
+        		if (!result.contains(key)) {
+					result.addItem(key);
+        		}
+        	}
+        	return result;
+        }
+
+
+        private function gridToClipboard():void {
+            var tabString:String = new String();
+            tabString += "Title: " + visualisation.title + "\n";
+            tabString += "Author(s): " + visualisation.author + "\n";
+            tabString += "Description: " + visualisation.description + "\n\n";
+            tabString += comboBoxIndicators.selectedItem.label + "\n\n";
+
+            // parse grid columns to tab separated values string
+            var grid:DataGrid = valuesDataGrid;
+            var columns:Array = grid.columns;
+            var columnsString:String = "";
+            var emptyLineString:String = "";
+
+            for each (var column:DataGridColumn in columns) {
+                if (columnsString.length > 0) {
+                    columnsString += "\t";
+                    emptyLineString += "\t";
+                }
+                columnsString += column.headerText;
+            }
+            tabString += columnsString + "\n" + emptyLineString + "\n";
+
+            // parse grid data to tab separated values string
+            var data:Object = grid.dataProvider;
+            if ((data is ArrayCollection) && (data.length > 0)) {
+                var fields:String;
+                for each(var item:Object in data) {
+                    fields = "";
+                    for each (column in columns) {
+                        if (fields.length > 0) {
+                            fields += "\t";
+                        }
+                        if (item.hasOwnProperty(column.dataField)) {
+                            fields += item[column.dataField];
+                        } else {
+                            fields += "N/A";
+                        }
+                    }
+                    tabString += fields + "\n";
+                }
+            }
+
+            System.setClipboard(tabString);
+        }
+			
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Styles
+     ===========================================================================
+     -->
+
+    <mx:Style>
+        .left {
+            text-align: left;
+        }
+    </mx:Style>
+
+    <!--
+     ===========================================================================
+         Formatters
+     ===========================================================================
+     -->
+
+	<mx:NumberFormatter id="numberFormatter"
+		useThousandsSeparator="false"
+		precision="2"
+		rounding="nearest"
+		/>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:VBox width="100%"
+             horizontalAlign="center" verticalAlign="middle"
+             borderStyle="solid" cornerRadius="10"
+             horizontalGap="4"
+             paddingLeft="10" paddingRight="10"
+             paddingTop="5" paddingBottom="5"
+             backgroundAlpha="0.5" backgroundColor="#FCFBD9">
+        <mx:HBox width="100%" verticalAlign="middle">
+            <mx:Label text="Indicator:" width="100" textAlign="right" fontWeight="bold"/>
+            <mx:ComboBox id="comboBoxIndicators"
+                         change="refresh()"
+                         width="100%"
+                    />
+            <mx:ComboBox id="comboBoxValueTypes"
+                         change="refresh()"
+                    />
+        </mx:HBox>
+        <mx:HBox width="100%" verticalAlign="middle">
+            <mx:Label text="Options:" width="100" textAlign="right" fontWeight="bold"/>
+            <mx:CheckBox id="checkBoxMergeData"
+                         label="Create columns per experiment"
+                         selected="false"
+                         change="refresh()"/>
+            <mx:CheckBox id="checkBoxShowInternalFields"
+                         label="Show internal fields"
+                         selected="false"
+                         change="refresh()"/>
+            <mx:Spacer width="100%"/>
+            <mx:LinkButton id="exportVisualisationButton"
+                           label="Copy"
+                           click="gridToClipboard()"
+                           enabled="{visualisation != null}"
+                           toolTip="Copy the table data to the clipboard"
+                           icon="@Embed('/img/icons/seamless-clipboard.gif')"
+                           disabledIcon="@Embed('/img/icons/seamless-clipboard-greyed.gif')"
+                    />
+        </mx:HBox>
+    </mx:VBox>
+
+    <mx:DataGrid id="valuesDataGrid"
+                 width="100%" height="100%"
+                 variableRowHeight="true"
+            />
+
+</mx:VBox>

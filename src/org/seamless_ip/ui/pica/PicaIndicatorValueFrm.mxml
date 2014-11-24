@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: PicaIndicatorValueFrm.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:TitleWindow height="300"
+                layout="vertical"
+                title="Indicator value"
+                width="400"
+                xmlns:mx="http://www.adobe.com/2006/mxml">
+
+    <mx:Script>
+        <![CDATA[
+        import org.seamless_ip.services.transferobjects.pica.InstitutionalCompatibility;
+        import org.seamless_ip.services.transferobjects.pica.PICAIndicatorValue;
+
+        private var _picaIndicatorValue:PICAIndicatorValue = null;
+        [Bindable]
+        public var institutionalCompatibility:InstitutionalCompatibility = null;
+
+        [Bindable]
+        public function set picaIndicatorValue(value:PICAIndicatorValue):void {
+            _picaIndicatorValue = value;
+        }
+
+        public function get picaIndicatorValue():PICAIndicatorValue {
+            return _picaIndicatorValue;
+        }
+
+        private function spatialLevelCmb():void {
+            if (picaIndicatorValue != null && institutionalCompatibility != null && institutionalCompatibility.PICASpatialLevels != null) {
+                // Will this work?
+                cmbSpatialLevel.selectedItem = picaIndicatorValue.picaSpatialLevel;
+            }
+        }
+        ]]>
+    </mx:Script>
+
+    <mx:Form height="100%"
+             width="100%">
+        <mx:FormItem label="Level"
+                     width="100%">
+            <mx:HSlider maximum="10"
+                        minimum="0"
+                        value="{picaIndicatorValue.assessmentLevelPICAIndicator}"
+                        width="100%"/>
+        </mx:FormItem>
+        <mx:FormItem label="Spatial level"
+                     width="100%">
+            <mx:ComboBox dataProvider="{institutionalCompatibility.PICASpatialLevels}"
+                         id="cmbSpatialLevel"
+                         labelField="name"
+                         width="100%">
+            </mx:ComboBox>
+        </mx:FormItem>
+        <mx:FormItem label="Value"
+                     width="100%">
+            <mx:HSlider maximum="10"
+                        minimum="0"
+                        width="100%"/>
+        </mx:FormItem>
+        <mx:FormItem>
+            <mx:HBox horizontalAlign="right"
+                     verticalAlign="bottom"
+                     width="100%">
+                <mx:Spacer width="100%"/>
+                <mx:Button click="{close()}"
+                           disabledIcon="@Embed('/img/icons/delete_edit_d.gif')"
+                           icon="@Embed('/img/icons/delete_edit.gif')"
+                           label="Discard"
+                           toolTip="Discard all changes"/>
+                <mx:Button click="{save()}"
+                           disabledIcon="@Embed('/img/icons/save_edit_d.gif')"
+                           icon="@Embed('/img/icons/save_edit.gif')"
+                           id="btnSave"
+                           label="Save"
+                           toolTip="Save all changes"/>
+            </mx:HBox>
+        </mx:FormItem>
+    </mx:Form>
+</mx:TitleWindow>

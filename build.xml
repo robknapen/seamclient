@@ -1,0 +1,90 @@
+<!--
+	build.xml 
+	===========================================================================
+	Build file for the main seamgui web application. This compiles the core
+	part of the application, stages all files, creates the war file and deploys
+	it to the test server.
+	
+	Targets:
+	build: Compiles the Flex application
+	stage: Creates the Web folder with all data and compiled code
+	dist: Creates the war file from the Web folder
+	deploy: Puts the war file on the test server
+	
+	These Flex build files are based on the Antennae open source project, for
+	more information please see the build files in the tools folder.
+	===========================================================================
+	This work has been carried out as part of the SEAMLESS Integrated Framework
+	project, EU 6th Framework Programme, contract no. 010036-2.
+
+	Copyright (c) 2008 The SEAMLESS project. All rights reserved.
+	
+	For more information: www.seamless-ip.org; email: seamless.office@wur.nl
+	===========================================================================
+	Author : Rob Knapen
+	===========================================================================
+-->
+<project name="wallace" default="build">
+    <!-- Project specific overrides -->
+    <!-- This overrides the default in build-common-properties.xml -->
+    <property name="project.name" value="wallace" />
+
+	<!-- Set and freeze some FLEX mxmlc compiler options (properties can not be overwritten!) -->
+	<property name="flex.mxmlc.compiler.services" value="../gromit/WebContent/WEB-INF/flex/services-config.xml" />
+	<property name="flex.mxmlc.compiler.context-root" value="/gromit" />
+	
+    <!-- Common properties and targets -->
+	<import file="build-imports.xml"/>
+	
+    <!-- Build path -->
+    <path id="flex.lib.path">
+        <pathelement location="../wallace/libs/flexunit.swc" />
+        <pathelement location="../wallace/libs/ilog-elixir.swc" />
+        <pathelement location="../wallace/libs/ilog-elixir_rb.swc" />
+        <pathelement location="../wallace/libs/datavisualization.swc" />
+        <pathelement location="../wallace/libs/datavisualization_rb.swc" />
+        <pathelement location="../wallace/libs/AutoComplete.swc" />
+        <pathelement location="../wallace/libs/flare.swc" />
+    </path>
+
+    <!-- Project specific targets -->
+    <target name="build" depends="init,flex-application" description="Build the application" />
+	
+    <target name="stage" depends="build" description="Stage the application">
+        <echo>=== STAGING WALLACE ===</echo>
+    	<mkdir dir="${build.stage.dir}"/>
+    	<!-- get all skeleton files, expect the template files -->
+        <copy todir="${build.stage.dir}">
+            <fileset dir="html-template">
+                <exclude name="**/template.*" />
+            </fileset>
+        </copy>
+    	<!-- create an index.html from the template.index.html -->
+    	<!-- FIXME: currently not working on build server and disabled. Replaced with fixed index.html file.
+        <copy todir="${build.stage.dir}">
+            <fileset dir="html-template">
+                <include name="**/template.*" />
+            </fileset>
+            <filterset>
+                <filter token="APP_NAME" value="${project.name}" />
+            </filterset>
+            <regexpmapper from="(.*)template\.(.*)" to="\1\2"/>
+        </copy>
+        -->
+    	<!-- get the compiled swf file -->
+        <copy todir="${build.stage.dir}">
+            <fileset dir="${build.mxmlc.dir}"/>
+        </copy>
+    </target>
+	
+	<target name="deploy" depends="stage" description="Deploy the application">
+        <echo>=== DEPLOYING WALLACE ===</echo>
+		<copy todir="../gromit/WebContent/wallace/">
+			<fileset dir="${build.stage.dir}">
+				<include name="**/**"/>
+				<exclude name="WEB-INF/**"/>
+			</fileset>
+		</copy>
+	</target>
+	
+</project>

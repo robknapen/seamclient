@@ -1,0 +1,470 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: IndicatorFramework.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+           width="100%"
+           height="100%"
+           xmlns:ns1="org.seamless_ip.ui.indicators.*"
+           paddingLeft="10"
+           paddingRight="10"
+           paddingTop="10"
+           paddingBottom="10"
+           backgroundAlpha="0.0"
+           xmlns:common="org.seamless_ip.ui.common.*"
+        >
+
+    <!--
+	Container for the Indicator Framework grid. The container allows the user
+	to select some of the values for indicator categories (e.g. domain and
+	spatial extent) that are used to pre-configure the grid.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.binding.utils.BindingUtils;
+        import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.rpc.events.FaultEvent;
+        import mx.rpc.events.ResultEvent;
+
+        import org.seamless_ip.services.transferobjects.indi.IIndicator;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        private const TOOLTIP_GOF:String =
+                "Displays the selected indicators in a matrix along multiple themes (Goals, Processes, Means, Economic, Environmental, Social) and sub-themes.";
+        private const TOOLTIP_TABLE:String =
+                "Select indicators using a tabular view of all available indicators.";
+
+
+        /**
+         * The indicator library created and used in this component.
+         */
+        [Bindable]
+        public var indicatorLibrary:IndicatorLibrary = new IndicatorLibrary();
+
+        /**
+         * Context information about the current active project that
+         * contains the indicator selection.
+         */
+        [Bindable]
+        private var _project:Project;
+        [Bindable]
+        private var _user:User;
+        [Bindable]
+        private var _projectSelectedModels:ArrayCollection = new ArrayCollection();
+
+        [Bindable]
+        public var requestsInProgress:Number = 0;
+        [Bindable]
+        public var progressMessage:String = "Idle";
+
+        [Bindable]
+        private var _modified:Boolean = false;
+        [Bindable]
+        private var _editable:Boolean = false;
+        [Bindable]
+        private var _initialized:Boolean = false;
+
+        // temp storage of user and project to init after library has finished downloaded
+        private var _delayedInitUser:User;
+        private var _delayedInitProject:Project;
+
+
+        /**
+         * Component initialisation. Downloads the indicator library
+         * from the server, but only once, and updates for the specified
+         * user and project. Call each time before showing the component.
+         */
+        public function init(user:User = null, project:Project = null):void {
+
+            // detect invalid state, disable screen
+            if ((user == null) || (project == null)) {
+                viewStackMain.selectedChild = viewProgress;
+                progressMessage = "Functionality not available, please log in and open a project first!";
+                return;
+            }
+
+            if (!_initialized) {
+                _delayedInitUser = user;
+                _delayedInitProject = project;
+                viewStackMain.selectedChild = viewProgress;
+                progressMessage = "Downloading Indicator Library";
+                BindingUtils.bindSetter(updateInitializeState, indicatorLibrary, "initInProgress");
+                indicatorLibrary.init();
+            }
+            else {
+                updateForUserAndProject(user, project);
+            }
+        }
+
+
+        /**
+         * Tracks the state of the indicator library loading.
+         */
+        public function updateInitializeState(val:String):void {
+            if (!indicatorLibrary.initInProgress) {
+                _initialized = true;
+                viewStackMain.selectedChild = viewManager;
+                updateForUserAndProject(_delayedInitUser, _delayedInitProject);
+                _delayedInitUser = null;
+                _delayedInitProject = null;
+            }
+        }
+
+
+        /**
+         * Updates the component view for the specified user and project.
+         */
+        private function updateForUserAndProject(user:User, project:Project):void {
+            _user = user;
+            if (_project != project) {
+                _project = project;
+                retrieveProjectData();
+            }
+            updateEditableState();
+        }
+
+
+        /**
+         * Updates the editable state of the component according to the
+         * current active user.
+         */
+        private function updateEditableState():void {
+            _editable = false;
+            if ((_user != null) && (_project != null)) {
+                _editable = _user.canDoForProject(_project.id, "UPDATE", "INDICATOR");
+            }
+        }
+
+
+        /**
+         * Generic handler of server errors from remote method calls.
+         */
+        private function serverFaultHandler(event:FaultEvent):void {
+            Alert.show("Error retrieving data from server: " + event.fault.faultString, "Server error");
+            updateProgress(true);
+        }
+
+
+        /**
+         * Updates the server request progress state of the component by
+         * tracking the number of started and completed tasks. As long as
+         * there are active tasks (downloads in progress) a progress view
+         * will be made visible.
+         */
+        private function updateProgress(taskCompleted:Boolean = false):void {
+            if (!taskCompleted) {
+                requestsInProgress++;
+            }
+            else {
+                if (requestsInProgress > 0)
+                    requestsInProgress--;
+            }
+
+            if (requestsInProgress > 0) {
+                progressMessage = "Download in progress, " + requestsInProgress + " task(s) remaining";
+                viewStackMain.selectedChild = viewProgress;
+            }
+            else {
+                progressMessage = "Download completed";
+                ifgDomain.init();
+                itLibrary.init();
+                viewStackMain.selectedChild = viewManager;
+            }
+        }
+
+
+        /**
+         * Handles change notifications from the input fields.
+         */
+        private function changed(event:Event):void {
+            if (_editable) {
+                _modified = true;
+                labelStatus.text = "Do not forget to save!";
+                labelStatus.setStyle("color", 0xFF0000);
+            }
+        }
+
+
+        /**
+         * Updates the project with the new selection of indicators and
+         * saves the project to the database.
+         */
+        private function saveHandler():void {
+            storeProjectData();
+            _modified = false;
+            labelStatus.text = "";
+        }
+
+
+        /**
+         * Restores the selection of indicators to the previous state as
+         * stored in the project.
+         */
+        private function resetHandler():void {
+            retrieveProjectData();
+            _modified = false;
+            labelStatus.text = "";
+        }
+
+
+        /**
+         * Loads the project dependant data from the server.
+         */
+        private function retrieveProjectData():void {
+            indicatorLibrary.clearSelection();
+
+            if ((_project != null) && (_project.problem != null)) {
+                indicatorService.findIndicatorIdsForProblem(_project.problem.id);
+                updateProgress();
+
+                projectService.getSelectedModelsForProject(_project.id);
+                updateProgress();
+            }
+        }
+
+
+        /**
+         * Stores the indicator selection for the current project on the
+         * server.
+         */
+        private function storeProjectData():void {
+            if ((_project != null) && (_project.problem != null)) {
+                var ids:ArrayCollection = new ArrayCollection();
+                for each (var indi:IIndicator in indicatorLibrary.allIndicators()) {
+                    if (indi.getSelected())
+                        ids.addItem(indi.getId());
+                }
+
+                indicatorService.updateIndicatorIdsForProblem(_project.problem.id, ids);
+                updateProgress();
+            }
+        }
+
+
+        /**
+         * Handles the result from the retrieveIndicatorIds method call.
+         * Clears the current indicator selection and updates it according
+         * to the data returned by the server.
+         */
+        private function retrieveIndicatorIdsHandler(event:ResultEvent):void {
+            var ids:ArrayCollection = event.result as ArrayCollection;
+
+            // update indicator library according to new selection
+            indicatorLibrary.clearSelection();
+            if (ids != null) {
+                for each (var indi:IIndicator in indicatorLibrary.allIndicators()) {
+                    for each (var id:String in ids) {
+                        if (indi.getId() == id) {
+                            indi.setSelected(true);
+                            break;
+                        }
+                    }
+                }
+            }
+            updateProgress(true);
+        }
+
+
+        /**
+         * Handles the result of the retrieveModelsForProject remote
+         * method call.
+         */
+        private function retrieveModelsForProjectHandler(event:ResultEvent):void {
+            _projectSelectedModels = event.result as ArrayCollection;
+            updateProgress(true);
+        }
+
+
+        /**
+         * Handles the result of the storeIndicatorIds remote method
+         * call.
+         */
+        private function storeIndicatorIdsHandler(event:ResultEvent):void {
+            updateProgress(true);
+        }
+
+		]]>
+	</mx:Script>
+
+
+    <!--
+     ===========================================================================
+         Server Access
+     ===========================================================================
+     -->
+
+    <mx:RemoteObject id="projectService"
+                     destination="projectService"
+            >
+        <!-- Collection<ModelTO> getSelectedModelsForProject(Long projectId) -->
+        <mx:method name="getSelectedModelsForProject"
+                   fault="serverFaultHandler(event)"
+                   result="retrieveModelsForProjectHandler(event)"
+                />
+    </mx:RemoteObject>
+
+    <mx:RemoteObject id="indicatorService"
+                     destination="indicatorService"
+            >
+        <!-- List<String> findIndicatorIdsForProblem(Long problemId) -->
+        <mx:method name="findIndicatorIdsForProblem"
+                   fault="serverFaultHandler(event)"
+                   result="retrieveIndicatorIdsHandler(event)"
+                />
+        <!-- void updateIndicatorIdsForProblem(Long problemId, List<String> indicatorIds) -->
+        <mx:method name="updateIndicatorIdsForProblem"
+                   fault="serverFaultHandler(event)"
+                   result="storeIndicatorIdsHandler(event)"
+                />
+    </mx:RemoteObject>
+
+    <!--
+     ===========================================================================
+         Effects
+         Used when changing views.
+     ===========================================================================
+     -->
+
+    <mx:Fade id="viewIn" duration="600" alphaFrom="0" alphaTo="1"/>
+    <mx:Fade id="viewOut" duration="100" alphaFrom="1" alphaTo="0"/>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:ViewStack id="viewStackMain"
+                  width="100%"
+                  height="100%"
+                  creationPolicy="all"
+            >
+
+        <common:ServerProgressView id="viewProgress"
+                                   width="100%"
+                                   height="100%"
+                                   showEffect="viewIn"
+                                   hideEffect="viewOut"
+                                   progressMessage="{progressMessage}"
+                />
+
+        <mx:VBox id="viewManager"
+                 width="100%"
+                 height="100%"
+                 creationPolicy="all"
+                 paddingBottom="5"
+                 paddingTop="5"
+                 paddingLeft="5"
+                 paddingRight="5"
+                 showEffect="viewIn"
+                 hideEffect="viewOut"
+                >
+
+            <mx:ViewStack id="viewStackIndicators"
+                          width="100%"
+                          height="100%"
+                          backgroundColor="#aa7903"
+                          backgroundAlpha="0.1"
+                          creationPolicy="all"
+                    >
+
+                <mx:Canvas label="Goal Oriented Framework"
+                           toolTip="{TOOLTIP_GOF}"
+                           width="100%" height="100%" enabled="true"
+                        >
+                    <ns1:IndicatorFrameworkGrid id="ifgDomain"
+                                                width="100%" height="100%"
+                                                indicatorLibrary="{indicatorLibrary}"
+                                                selectableModels="{_projectSelectedModels}"
+                                                change="changed(event)"
+                                                editable="{_editable}"
+                            />
+                </mx:Canvas>
+
+                <mx:Canvas label="Indicator Library"
+                           toolTip="{TOOLTIP_TABLE}"
+                           width="100%" height="100%" enabled="true"
+                        >
+                    <ns1:IndicatorTable id="itLibrary"
+                                        width="100%" height="100%"
+                                        indicatorLibrary="{indicatorLibrary}"
+                                        selectableModels="{_projectSelectedModels}"
+                                        change="changed(event)"
+                                        editable="{_editable}"
+                            />
+                </mx:Canvas>
+            </mx:ViewStack>
+
+            <mx:HBox
+                    width="100%"
+                    horizontalAlign="right" verticalAlign="middle" borderStyle="none" cornerRadius="10"
+                    backgroundColor="#dcdcd0" backgroundAlpha="0.1"
+                    paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" horizontalGap="2"
+                    >
+
+                <mx:Label text="Choose view:"/>
+
+                <mx:ToggleButtonBar dataProvider="viewStackIndicators">
+                </mx:ToggleButtonBar>
+
+                <mx:Spacer width="100%"/>
+
+                <mx:Label id="labelStatus"
+                          text=""
+                          truncateToFit="true"
+                          width="200"
+                          maxWidth="200"
+                          textAlign="right"
+                          color="#808080"
+                        />
+                <mx:LinkButton
+                        label="Save"
+                        visible="{_editable}"
+                        enabled="{_modified}"
+                        icon="@Embed('/img/icons/seamless-save.gif')"
+                        click="saveHandler()"
+                        toolTip="Save all changes"
+                        disabledIcon="@Embed('/img/icons/seamless-save-greyed.gif')"
+                        />
+                <mx:LinkButton
+                        label="Discard"
+                        visible="{_editable}"
+                        enabled="{_modified}"
+                        click="resetHandler()"
+                        toolTip="Discard all changes"
+                        icon="@Embed('/img/icons/seamless-undo.gif')"
+                        disabledIcon="@Embed('/img/icons/seamless-undo-greyed.gif')"
+                        />
+            </mx:HBox>
+        </mx:VBox>
+    </mx:ViewStack>
+</mx:Canvas>

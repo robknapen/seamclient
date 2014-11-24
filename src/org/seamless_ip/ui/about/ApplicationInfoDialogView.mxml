@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: ApplicationInfoDialogView.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<sif:ApplicationInfoDialog
+        xmlns:mx="http://www.adobe.com/2006/mxml"
+        xmlns:sif="org.seamless_ip.ui.about.*"
+        layout="vertical"
+        title="About this Application" showCloseButton="true"
+        creationComplete="init()">
+
+    <mx:Script>
+        <![CDATA[
+
+        /**
+         * About dialog for showing version number and other detailed information for
+         * the application.
+         *
+         * @author Rob Knapen; Alterra, Wageningen UR
+         */
+
+        import mx.controls.Alert;
+        import mx.events.CloseEvent;
+        import mx.rpc.events.FaultEvent;
+        import mx.rpc.events.ResultEvent;
+
+        [Bindable]
+        private var disclaimersText:String =
+                "Data sources: Data collected for the SEAMLESS project and " +
+                "data adapted for the project, primarily from EU-FADN – DG " +
+                "AGRI G-3 and JRC/AGRIFISH Data Base - EC – JRC.";
+
+        [Bindable]
+        private var databaseServerUrl:String = "Pending...";
+
+        private function init():void {
+            addEventListener(CloseEvent.CLOSE, closeMe);
+            projectService.getDatabaseInfo();
+        }
+
+
+        private function serverFaultHandler(event:FaultEvent):void {
+            Alert.show("Error retrieving data from server: " + event.fault.faultString, "Server error");
+        }
+
+
+        private function getDatabaseInfoHandler(event:ResultEvent):void {
+            var jdbcUrl:String = event.result as String;
+            if (jdbcUrl != null) {
+                // jdbc:postgres://trac.seamless-ip.org:5432/seamdb...
+                var items:Array = jdbcUrl.split("/");
+                if (items.length >= 2) {
+                    databaseServerUrl = "Using database: " + items[items.length - 1] + " at " + items[items.length - 2];
+                } else {
+                    databaseServerUrl = "Using database at: " + jdbcUrl;
+                }
+            }
+        }
+
+        ]]>
+    </mx:Script>
+
+    <!--
+     ===========================================================================
+         Server Access
+     ===========================================================================
+     -->
+
+    <mx:RemoteObject id="projectService"
+                     destination="projectService"
+            >
+        <!-- public String getDatabaseInfo() -->
+        <mx:method name="getDatabaseInfo"
+                   fault="serverFaultHandler(event)"
+                   result="getDatabaseInfoHandler(event)"
+                />
+    </mx:RemoteObject>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:VBox height="100%" verticalGap="1">
+
+        <mx:Image
+                height="300"
+                width="475"
+                source="@Embed('/img/splash/seamlessif-sa-splash.png')"
+                scaleContent="false"
+                horizontalCenter="0"/>
+        <mx:Spacer height="5"/>
+        <mx:TextArea id="disclaimersLabel"
+                     text="{disclaimersText}"
+                     editable="false"
+                     width="100%"
+                     wordWrap="true"
+                     enabled="true" color="#A1A1A1" borderStyle="none" paddingLeft="0" paddingRight="0" height="70"/>
+        <mx:HRule width="100%"/>
+
+        <mx:Label id="versionLabel"
+                  text="{versionText}"
+                  width="100%"
+                  horizontalCenter="0"
+                  textAlign="left"/>
+
+        <mx:Label id="seamserverLabel"
+                  text="{seamserverText}"
+                  width="100%"
+                  horizontalCenter="0"
+                  textAlign="left"/>
+
+        <mx:Label id="databaseserverLabel"
+                  text="{databaseServerUrl}"
+                  width="100%"
+                  horizontalCenter="0"
+                  textAlign="left"/>
+
+        <mx:Spacer height="5"/>
+
+    </mx:VBox>
+
+</sif:ApplicationInfoDialog>

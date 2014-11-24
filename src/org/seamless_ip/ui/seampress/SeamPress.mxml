@@ -1,0 +1,726 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: SeamPress.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+         width="100%"
+         height="100%"
+         paddingLeft="10"
+         paddingRight="10"
+         paddingTop="10"
+         paddingBottom="10"
+         xmlns:ns="org.seamless_ip.ui.common.*"
+         creationComplete="init()"
+         xmlns:ns1="org.seamless_ip.ui.seampress.*">
+
+    <!-- TODO Refactor this first version of the component -->
+
+    <!--
+        Container for the Seam:PRESS component, the data visualization tool of
+        SEAMLESS-IF.
+
+        @author Rob Knapen
+    -->
+    <mx:Script>
+		<![CDATA[
+			import mx.collections.Sort;
+			import mx.collections.SortField;
+        import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.core.IFlexDisplayObject;
+        import mx.events.CloseEvent;
+        import mx.managers.PopUpManager;
+        import mx.rpc.events.FaultEvent;
+        import mx.rpc.events.ResultEvent;
+
+        import org.seamless_ip.services.transferobjects.indi.IIndicator;
+        import org.seamless_ip.services.transferobjects.seamproj.Experiment;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        [Bindable]
+        private var _user:User = null;
+        [Bindable]
+        private var _project:Project = null;
+        [Bindable]
+        private var _projectExperiments:ArrayCollection = new ArrayCollection();
+        [Bindable]
+        private var _projectIndicators:ArrayCollection = new ArrayCollection();
+        [Bindable]
+        private var _projectVisualisations:ArrayCollection = new ArrayCollection();
+        [Bindable]
+        private var _values:IndicatorValues = new IndicatorValues();
+        [Bindable]
+        private var _activeVisualisation:Visualisation = null;
+        [Bindable]
+        private var _modified:Boolean = false;
+
+        [Bindable]
+        public var requestsInProgress:Number = 0;
+        [Bindable]
+        public var progressMessage:String = "Idle";
+
+
+        public function init(user:User = null, project:Project = null):void {
+            _user = user;
+            _project = project;
+            _activeVisualisation = null;
+            _projectExperiments.removeAll();
+            _projectIndicators.removeAll();
+            _values.clear();
+
+            if (_project != null) {
+                resultPresentationService.retrieveIndicatorsForProject(_project);
+                updateProgress();
+
+                resultPresentationService.retrieveExperimentsForProject(_project);
+                updateProgress();
+
+                if (_user != null) {
+                    resultPresentationService.retrieveVisualisationsForProject(_user.id, _project);
+                    updateProgress();
+                }
+            }
+        }
+
+
+        private function retrieveIndicatorsHandler(event:ResultEvent):void {
+            _projectIndicators = event.result as ArrayCollection;
+            updateProgress(true);
+        }
+
+
+        private function retrieveExperimentsHandler(event:ResultEvent):void {
+            _projectExperiments = event.result as ArrayCollection;
+            
+            // sort experiments on title
+	        var titleSortField:SortField = new SortField("title", true, false, false);
+	        var titleSort:Sort = new Sort();
+	        titleSort.fields = [titleSortField];
+	        _projectExperiments.sort = titleSort;
+	        _projectExperiments.refresh();
+            
+            updateProgress(true);
+        }
+
+
+        private function retrieveVisualisationsHandler(event:ResultEvent):void {
+            _projectVisualisations = event.result as ArrayCollection;
+            
+            // sort visualisations on title
+	        var titleSortField:SortField = new SortField("title", true, false, false);
+	        var titleSort:Sort = new Sort();
+	        titleSort.fields = [titleSortField];
+	        _projectVisualisations.sort = titleSort;
+	        _projectVisualisations.refresh();
+            
+            _activeVisualisation = null;
+            updateProgress(true);
+        }
+
+
+        private function storeVisualisationsHandler(event:ResultEvent):void {
+            updateProgress(true);
+        }
+
+
+        private function retrieveResultsHandler(event:ResultEvent):void {
+            var values:ArrayCollection = event.result as ArrayCollection; // IndicatorValue instances
+
+            if (values.length > 0) {
+                var experimentId:String = values[0].experimentId;
+                var indicatorId:String = values[0].indicatorId;
+
+                var results:ArrayCollection = new ArrayCollection();
+
+                for each (var value:Object in values) {
+                    var data:Object = new Object();
+                    data.baselineExperimentId = value.baselineExperimentId;
+                    data.hashCode = value.propertiesHashCode;
+
+                    for (var key:String in value.properties)
+                        data[key] = value.properties[key];
+
+                    data.value = value.value;
+                    results.addItem(data);
+                }
+
+                // create titles to store for experiment and indicator
+                var expTitle:String;
+                if ((_activeVisualisation != null) && (_activeVisualisation.baselineExperimentId == experimentId)) {
+                    expTitle = _activeVisualisation.baselineExperimentTitle;
+                } else {
+                    var exp:Experiment = findExperiment(experimentId);
+                    if (exp != null) {
+                        expTitle = exp.title;
+                    }
+                }
+                if ((expTitle == null) || (expTitle.length == 0)) {
+                    expTitle = "Experiment " + experimentId;
+                }
+
+                var indTitle:String;
+                var ind:IIndicator = findIndicator(indicatorId);
+                if (ind != null)
+                    indTitle = ind.getLabel_en() + " [" + ind.getUnit() + "]";
+                else
+                    indTitle = "Indicator " + indicatorId;
+
+                _values.storeValues(experimentId, expTitle, indicatorId, indTitle, results);
+            }
+
+            updateProgress(true);
+        }
+
+
+        private function retrieveExperimentTitleHandler(event:ResultEvent):void {
+            if (_activeVisualisation != null) {
+                // TODO should be better checked, e.g. also send id from server
+                _activeVisualisation.baselineExperimentTitle = event.result as String;
+            }
+            updateProgress(true);
+        }
+
+
+        private function serverFaultHandler(event:FaultEvent):void {
+            Alert.show("Error retrieving data from server: " + event.fault.faultString, "Server error");
+            updateProgress(true);
+        }
+
+
+        private function updateProgress(taskCompleted:Boolean = false):void {
+            if (!taskCompleted) {
+                requestsInProgress++;
+            }
+            else {
+                if (requestsInProgress > 0)
+                    requestsInProgress--;
+            }
+
+            if (requestsInProgress > 0) {
+                progressMessage = "Download in progress, " + requestsInProgress + " task(s) remaining";
+                if (mainView.selectedChild != progressView) {
+                    mainView.selectedChild = progressView;
+                }
+            }
+            else {
+                progressMessage = "Download completed";
+
+                if (_activeVisualisation == null) {
+                    mainView.selectedChild = noResultsView;
+                }
+                else {
+                    mainView.selectedChild = resultsView;
+                    updateVisualisation();
+                }
+            }
+            updateButtonState();
+        }
+
+
+        private function updateButtonState():void {
+            var allowed:Boolean;
+
+            allowed = allowProjectAction("READ", _project, requestsInProgress);
+            openVisualisationButton.enabled = (allowed && (_projectVisualisations.length > 0));
+
+            allowed = allowProjectAction("CREATE", _project, requestsInProgress);
+            createVisualisationButton.enabled = (allowed);
+
+            allowed = allowProjectAction("UPDATE", _project, requestsInProgress);
+            saveVisualisationButton.enabled = (allowed && _modified);
+            discardChangesButton.enabled = saveVisualisationButton.enabled;
+            editVisualisationButton.enabled = (allowed && (_activeVisualisation != null));
+
+            allowed = allowProjectAction("DELETE", _project, requestsInProgress);
+            deleteVisualisationButton.enabled = (allowed && (_activeVisualisation != null));
+        }
+
+
+        private function findIndicator(indicatorId:String):IIndicator {
+            for each (var indicator:IIndicator in _projectIndicators)
+                if (indicator.getId() == indicatorId)
+                    return indicator;
+            return null;
+        }
+
+
+        private function findExperiment(experimentId:String):Experiment {
+            for each (var experiment:Experiment in _projectExperiments)
+                if (experiment.id == experimentId)
+                    return experiment;
+            return null;
+        }
+
+
+        /**
+         * Displays a list of available visualisations from which the
+         * user can select one and open it for viewing.
+         */
+        private function openVisualisationDialog():void {
+            var dlg:IFlexDisplayObject = PopUpManager.createPopUp(this, VisualisationSelectorDialog, true);
+            VisualisationSelectorDialog(dlg).initialise(_projectVisualisations);
+            dlg.addEventListener(VisualisationEvent.VISUALISATION_OPEN, viewVisualisationHandler);
+            PopUpManager.centerPopUp(dlg);
+        }
+
+
+        /**
+         * Displays dialog to save current visualisation and maybe add
+         * or edit the title, description and authors for it.
+         */
+        private function saveVisualisationDialog():void {
+            // TODO Fix the save logic and dialog(s), disabled for now
+
+            // The save options stores ALL the visualisations on the
+            // server so only showing the dialog for the currently
+            // active visualisation is not logical to the user...
+
+            // var dlg:IFlexDisplayObject = PopUpManager.createPopUp(this, VisualisationSaveDialog, true);
+            // VisualisationSaveDialog(dlg).visualisation = _activeVisualisation;
+            // dlg.addEventListener(VisualisationEvent.VISUALISATION_SAVED, saveVisualisationsHandler);
+            // PopUpManager.centerPopUp(dlg);
+
+            saveVisualisationsHandler();
+        }
+
+
+        /**
+         * Sends visualisations to server to be stored.
+         */
+        private function saveVisualisationsHandler(event:VisualisationEvent = null):void {
+            if (_user != null) {
+                resultPresentationService.storeVisualisationsForProject(_user.id, _project, _projectVisualisations);
+                _modified = false;
+                labelStatus.text = "";
+                updateButtonState();
+            }
+        }
+
+
+        /**
+         * Displays a wizard dialog that helps the user at creating a
+         * new visualisation. The result is processed by the event
+         * handler for the dialog.
+         */
+        private function newVisualisationDialog():void {
+            var dlg:IFlexDisplayObject = PopUpManager.createPopUp(this, VisualisationSettingsDialog, true);
+            VisualisationSettingsDialog(dlg).initialise(_projectExperiments, _projectIndicators);
+            dlg.addEventListener(VisualisationEvent.VISUALISATION_CREATE, viewVisualisationHandler);
+            PopUpManager.centerPopUp(dlg);
+        }
+
+
+        /**
+         * Handles click from visualisation remove alert.
+         */
+        private function removeVisualisationDialogHandler(event:CloseEvent):void {
+            if ((event.detail == Alert.YES) && (_activeVisualisation != null)) {
+                var index:int = _projectVisualisations.getItemIndex(_activeVisualisation);
+                if (index != -1) {
+                    _projectVisualisations.removeItemAt(index);
+                    _activeVisualisation = null;
+                    mainView.selectedChild = noResultsView;
+                    changed();
+                }
+            }
+        }
+
+
+        /**
+         * Display alert that confirms removal of the selected
+         * visualisation.
+         */
+        private function removeVisualisationDialog():void {
+            if (_activeVisualisation != null) {
+                Alert.show(
+                        "Are you sure you want to remove the visualisation: '" + _activeVisualisation.title + "'?",
+                        "Remove visualisation",
+                        3,
+                        null,
+                        removeVisualisationDialogHandler
+                        );
+            }
+        }
+
+
+        /**
+         * Displays a wizard dialog that helps the user at modifying the
+         * current visualisation. The result is processed by the event
+         * handler for the dialog.
+         */
+        private function editVisualisationDialog():void {
+            if (_activeVisualisation != null) {
+                var dlg:IFlexDisplayObject = PopUpManager.createPopUp(this, VisualisationSettingsDialog, true);
+                VisualisationSettingsDialog(dlg).initialise(_projectExperiments, _projectIndicators);
+                VisualisationSettingsDialog(dlg).visualisation = _activeVisualisation;
+                dlg.addEventListener(VisualisationEvent.VISUALISATION_EDITED, viewVisualisationHandler);
+                PopUpManager.centerPopUp(dlg);
+            }
+        }
+
+
+        /**
+         * Handles change notifications from the input fields.
+         */
+        private function changed(event:Event = null):void {
+            _modified = true;
+            labelStatus.text = "Do not forget to save!";
+            labelStatus.setStyle("color", 0xFF0000);
+            updateButtonState();
+        }
+
+
+        private function restoreValues():void {
+            _modified = false;
+            labelStatus.text = "";
+            updateButtonState();
+            // restore data from server
+            resultPresentationService.retrieveVisualisationsForProject(_user.id, _project);
+            updateProgress();
+        }
+
+
+        /**
+         * View a visualisation after opening, creating or editing one.
+         */
+        private function viewVisualisationHandler(event:VisualisationEvent):void {
+            var v:Visualisation = event.visualisation;
+            var expId:String;
+            var indId:String;
+
+            if ((v != null) && (v.isValid())) {
+                // add new visualisations to the list
+                if (event.type == VisualisationEvent.VISUALISATION_CREATE) {
+                    _projectVisualisations.addItem(v);
+                    changed();
+                }
+                if (event.type == VisualisationEvent.VISUALISATION_EDITED) {
+                    changed();
+                }
+
+                _activeVisualisation = v;
+
+                // always retrieve baseline experiment indicators
+                if (v.baselineExperimentId == null) {
+                    Alert.show(
+                            "There is no baseline experiment defined for this visualisation, " +
+                            "calculating relative values will not be possible! " +
+                            "To solve this please edit the visualisation and select one of " +
+                            "the possible baselines.",
+                            "Baseline experiment not defined");
+                } else {
+                    // make sure title of baseline experiment is known and up-to-date
+                    resultPresentationService.retrieveExperimentTitle(v.baselineExperimentId);
+                    // retrieve indicator values for the baseline experiment
+                    for each (indId in v.indicatorIds) {
+                        if (!_values.containsValues(v.baselineExperimentId, indId)) {
+                            resultPresentationService.retrieveResults(v.baselineExperimentId, indId);
+                            updateProgress();
+                        }
+                    }
+                }
+
+                // retrieve selected policy experiment indicators
+                for each (expId in v.experimentIds) {
+                    for each (indId in v.indicatorIds) {
+                        if (!_values.containsValues(expId, indId)) {
+                            resultPresentationService.retrieveResults(expId, indId);
+                            updateProgress();
+                        }
+                    }
+                }
+
+                // when nothing is downloading continue with drawing the view
+                if (requestsInProgress == 0)
+                    updateVisualisation();
+            }
+            updateButtonState();
+        }
+
+
+        private function updateVisualisation():void {
+            if (_activeVisualisation != null) {
+                titleLabel.text = _activeVisualisation.title;
+                if (_activeVisualisation.author != null)
+                    titleLabel.text += " (by " + _activeVisualisation.author + ")";
+
+                // check if there is some data available
+                var dataAvailable:Boolean = false;
+                for each (var expId:String in _activeVisualisation.experimentIds) {
+                    for each (var indId:String in _activeVisualisation.indicatorIds) {
+                        if (_values.containsValues(expId, indId)) {
+                            dataAvailable = true;
+                            break;
+                        }
+                    }
+                    if (dataAvailable) {
+                        break;
+                    }
+                }
+
+                if (!dataAvailable) {
+                    Alert.show("No data available in the database matching your selection!", "No data to display");
+                    mainView.selectedChild = noResultsView;
+                }
+                else {
+                    // by default show the table view
+                    mainView.selectedChild = resultsView;
+                    outputViews.selectedChild = tableViewer;
+                    tableViewer.update(_activeVisualisation, _values);
+                }
+            }
+        }
+
+
+        /**
+         * Checks if the (current) user is allowed to perform a certain
+         * action.
+         */
+        private function allowAction(task:String, right:String, requests:int):Boolean {
+            if (requests == 0) {
+                if ((_user != null) && (_user.canDo(task, right)))
+                    return true;
+            }
+            return false;
+        }
+
+
+        /**
+         * Checks if the (current) user is allowed to perform a certain
+         * action for the current project.
+         */
+        private function allowProjectAction(task:String, item:Object, requests:int):Boolean {
+            if ((item != null) && item.hasOwnProperty("id") && (requests == 0)) {
+                if ((_user != null) && (_user.canDoForProject(item.id, task, "VISUALIZATION")))
+                    return true;
+            }
+            return false;
+        }
+			
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Server Access
+     ===========================================================================
+     -->
+
+    <mx:RemoteObject id="resultPresentationService"
+                     destination="resultPresentationService"
+                     showBusyCursor="true"
+            >
+        <mx:method name="retrieveIndicatorsForProject"
+                   fault="serverFaultHandler(event)"
+                   result="retrieveIndicatorsHandler(event)"
+                />
+        <mx:method name="retrieveExperimentsForProject"
+                   fault="serverFaultHandler(event)"
+                   result="retrieveExperimentsHandler(event)"
+                />
+        <!-- Collection<VisualisationTO> retrieveVisualisationsForProject(Long userId, ProjectTO project) -->
+        <mx:method name="retrieveVisualisationsForProject"
+                   fault="serverFaultHandler(event)"
+                   result="retrieveVisualisationsHandler(event)"
+                />
+        <!-- void storeVisualisationsForProject(Long userId, ProjectTO project, Collection<VisualisationTO> visualisations) -->
+        <mx:method name="storeVisualisationsForProject"
+                   fault="serverFaultHandler(event)"
+                   result="storeVisualisationsHandler(event)"
+                />
+        <mx:method name="retrieveResults"
+                   fault="serverFaultHandler(event)"
+                   result="retrieveResultsHandler(event)"
+                />
+        <!-- String retrieveExperimentTitle(Long experimentId) -->
+        <mx:method name="retrieveExperimentTitle"
+                   fault="serverFaultHandler(event)"
+                   result="retrieveExperimentTitleHandler(event)"
+                />
+        <!-- String retrieveIndicatorTitle(Long indicatorId) -->
+    </mx:RemoteObject>
+
+    <!--
+     ===========================================================================
+         Effects
+         Used when changing views.
+     ===========================================================================
+     -->
+
+    <mx:Fade id="viewIn" duration="600" alphaFrom="0" alphaTo="1"/>
+    <mx:Fade id="viewOut" duration="100" alphaFrom="1" alphaTo="0"/>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:ViewStack id="mainView"
+                  width="100%" height="100%"
+                  borderStyle="solid" cornerRadius="5"
+                  alpha="0.8"
+                  creationPolicy="all"
+                  paddingLeft="5" paddingRight="5"
+                  paddingBottom="5" paddingTop="5"
+            >
+
+        <ns:ServerProgressView id="progressView"
+                               width="100%"
+                               height="100%"
+                               progressMessage="{progressMessage}"
+                               showEffect="viewIn"
+                               hideEffect="viewOut"
+                />
+
+        <mx:VBox id="noResultsView"
+                 width="100%"
+                 height="100%"
+                 horizontalAlign="center"
+                 verticalAlign="middle"
+                 showEffect="viewIn"
+                 hideEffect="viewOut"
+                >
+            <mx:Label text="Create or open a visualisation to view model results" enabled="false"/>
+        </mx:VBox>
+
+        <mx:VBox id="resultsView"
+                 width="100%"
+                 height="100%"
+                 showEffect="viewIn"
+                 hideEffect="viewOut"
+                >
+            <!-- shared header -->
+            <mx:VBox width="100%"
+                     verticalAlign="middle"
+                     horizontalAlign="center"
+                    >
+                <mx:Label id="titleLabel" text="None" fontSize="12" fontWeight="bold"/>
+            </mx:VBox>
+            <mx:TabNavigator id="outputViews"
+                             width="100%" height="100%">
+                <ns1:TableViewer id="tableViewer"
+                                 label="Table"
+                                 width="100%" height="100%"
+                                 show="tableViewer.update(_activeVisualisation, _values)"
+                        />
+                <ns1:CrossTableViewer id="crossTableViewer"
+                                      label="Cross Table"
+                                      width="100%" height="100%"
+                                      show="crossTableViewer.update(_activeVisualisation, _values)"
+                        />
+                <ns1:ChartViewer id="chartViewer"
+                                 experiments="{_projectExperiments}"
+                                 label="Chart"
+                                 enabled="true"
+                                 width="100%" height="100%"
+                                 show="chartViewer.update(_activeVisualisation, _values)"
+                        />
+                <ns1:SpiderViewer id="spiderViewer"
+                                  label="Radar Chart"
+                                  enabled="true"
+                                  width="100%" height="100%"
+                                  show="spiderViewer.update(_activeVisualisation, _values)"
+                        />
+                <ns1:MapViewer id="mapViewer"
+                               experiments="{_projectExperiments}"
+                               label="Map"
+                               enabled="true"
+                               width="100%" height="100%"
+                               show="mapViewer.update(_activeVisualisation, _values)"
+                               change="changed()"
+                        />
+            </mx:TabNavigator>
+        </mx:VBox>
+
+    </mx:ViewStack>
+
+    <mx:HBox width="100%" horizontalGap="4" verticalAlign="middle">
+        <mx:LinkButton id="createVisualisationButton"
+                       label="New..."
+                       enabled="false"
+                       click="newVisualisationDialog()"
+                       toolTip="Create a new visualisation of calculation results"
+                       icon="@Embed('/img/icons/seamless-visualisation.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-visualisation-greyed.gif')"
+                />
+        <mx:LinkButton id="openVisualisationButton"
+                       label="Open..."
+                       enabled="false"
+                       click="openVisualisationDialog()"
+                       toolTip="Open an existing visualisation from the project"
+                       icon="@Embed('/img/icons/seamless-open.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-open-greyed.gif')"
+                />
+        <mx:LinkButton id="editVisualisationButton"
+                       label="Edit..."
+                       enabled="false"
+                       click="editVisualisationDialog()"
+                       toolTip="Modify the current calculation results visualisation"
+                       icon="@Embed('/img/icons/seamless-edit.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-edit-greyed.gif')"
+                />
+        <mx:LinkButton id="deleteVisualisationButton"
+                       label="Delete"
+                       click="removeVisualisationDialog()"
+                       enabled="false"
+                       toolTip="Remove the current calculation results visualisation"
+                       icon="@Embed('/img/icons/seamless-delete.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-delete-greyed.gif')"
+                />
+        <mx:Spacer width="100%"/>
+        <mx:Label id="labelStatus"
+                  text=""
+                  truncateToFit="true"
+                  width="200"
+                  maxWidth="200"
+                  textAlign="right"
+                  color="#808080"
+                />
+        <mx:LinkButton id="saveVisualisationButton"
+                       label="Save All"
+                       enabled="false"
+                       click="saveVisualisationDialog()"
+                       toolTip="Save all the project visualisations on the server"
+                       icon="@Embed('/img/icons/seamless-save.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-save-greyed.gif')"
+                />
+        <mx:LinkButton id="discardChangesButton"
+                       label="Discard"
+                       enabled="false"
+                       toolTip="Discard all changes (reload project visualisations from the server)"
+                       click="restoreValues()"
+                       icon="@Embed('/img/icons/seamless-undo.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-undo-greyed.gif')"
+                />
+    </mx:HBox>
+
+</mx:VBox>

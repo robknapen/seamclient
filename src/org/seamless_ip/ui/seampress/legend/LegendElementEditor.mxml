@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: LegendElementEditor.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+	verticalAlign="middle" 
+	horizontalGap="5" horizontalScrollPolicy="off" 
+	verticalGap="0" verticalScrollPolicy="off" 
+	paddingBottom="0" paddingLeft="0"
+	paddingRight="0" paddingTop="0"
+	>
+
+    <!--
+    Editor for legend items.
+
+    @author Peter Verweij
+    @author Rob Knapen
+    -->
+	<mx:Script>
+		<![CDATA[
+
+			override public function set data(value: Object): void
+			{
+				super.data = value;
+				
+				// TODO: change viewstate to reflect specific editing for specialisations of LegendElement
+	//			captionInput.enabled = data is CategoryLegendElement;
+			} 
+	
+	
+			public function get newColour(): Number
+			{
+				return colourPicker.selectedColor;
+			}
+	
+				
+			public function get newCaption(): String
+			{
+				return captionInput.text;
+			}	
+			
+		]]>
+	</mx:Script>
+		
+
+	<mx:ColorPicker id="colourPicker" width="25" height="16" 
+		selectedColor="{data.colour}"/>
+	<mx:TextInput id="captionInput" text="{data.caption}"/>
+	
+</mx:HBox>

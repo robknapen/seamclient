@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: CrossTableViewer.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%">
+
+    <!--
+        Seam:PRESS component to visualise data in a table, using Flex advanced
+        datagrid functionality.
+
+        @author Rob Knapen
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+        import mx.controls.advancedDataGridClasses.AdvancedDataGridColumnGroup;
+
+        private var visualisation:Visualisation;
+        private var values:IndicatorValues;
+
+        public function update(visualisation:Visualisation, values:IndicatorValues):void {
+            this.visualisation = visualisation;
+            this.values = values;
+
+            var valueTypes:ArrayCollection = ValueType.values;
+            comboBoxValueTypes.dataProvider = valueTypes;
+
+            refresh();
+        }
+
+        private function refresh():void {
+            if ((visualisation != null) && (values != null)) {
+
+                var properties:ArrayCollection = values.getSharedProperties(
+                        visualisation.experimentIds,
+                        visualisation.indicatorIds,
+                        false
+                        );
+
+                var expTitles:ArrayCollection = values.getTitles(IndicatorValues.EXPERIMENT_TITLE, visualisation.experimentIds);
+                var indTitles:ArrayCollection = values.getTitles(IndicatorValues.INDICATOR_TITLE, visualisation.indicatorIds);
+
+                var columns:ArrayCollection = new ArrayCollection();
+                var dgColumn:AdvancedDataGridColumn;
+
+                // add columns for the properties
+                for each (var property:String in properties) {
+                    dgColumn = new AdvancedDataGridColumn(property);
+                    dgColumn.dataField = property;
+                    columns.addItem(dgColumn);
+                }
+
+                // add group per experiment
+                var dgColumnGroup:AdvancedDataGridColumnGroup;
+                for each (var exp:Object in expTitles) {
+                    dgColumnGroup = new AdvancedDataGridColumnGroup(exp.label);
+                    dgColumnGroup.headerText = exp.label;
+                    // add columns per indicator to each group
+                    var children:Array = dgColumnGroup.children;
+                    for each (var ind:Object in indTitles) {
+                        dgColumn = new AdvancedDataGridColumn(ind.label);
+                        dgColumn.headerText = ind.label;
+                        dgColumn.dataField = ind.label;
+                        dgColumn.sortable = true;
+                        children.push(dgColumn);
+                    }
+                    dgColumnGroup.children = children;
+                    columns.addItem(dgColumnGroup);
+                }
+
+                valuesDataGrid.groupedColumns = columns.toArray();
+
+                var data:ArrayCollection = values.createHierarchicalDataProvider(
+                        visualisation.experimentIds,
+                        visualisation.indicatorIds,
+                        ValueType(comboBoxValueTypes.selectedItem),
+                        false
+                        );
+                valuesDataGrid.dataProvider = data;
+                valuesDataGrid.invalidateDisplayList();
+            }
+        }
+
+
+        private function gridToClipboard():void {
+            var tabString:String = new String();
+            tabString += "Title: " + visualisation.title + "\n";
+            tabString += "Author(s): " + visualisation.author + "\n";
+            tabString += "Description: " + visualisation.description + "\n\n";
+
+            // parse grid columns to tab separated values string
+            var grid:AdvancedDataGrid = valuesDataGrid;
+            var columns:Array = grid.groupedColumns;
+            var columnHeader1:String = "";
+            var columnHeader2:String = "";
+            var emptyLine:String = "";
+            var column:Object;
+
+            // create first level column headers (groups)
+            for each (column in columns) {
+                if (columnHeader1.length > 0) {
+                    columnHeader1 += "\t";
+                    emptyLine += "\t";
+                }
+                if (column is AdvancedDataGridColumnGroup) {
+                    columnHeader1 += column.headerText;
+                    var nrSubcolumns:Number = AdvancedDataGridColumnGroup(column).children.length;
+                    for (var i:int = 0; i < nrSubcolumns - 1; i++) {
+                        columnHeader1 += "\t";
+                        emptyLine += "\t";
+                    }
+                } else {
+                    columnHeader1 += "...";
+                }
+
+            }
+
+            // create second level column headers
+            for each (column in columns) {
+                if (column is AdvancedDataGridColumnGroup) {
+                    for each (var subColumn:Object in AdvancedDataGridColumnGroup(column).children) {
+                        if (columnHeader2.length > 0) {
+                            columnHeader2 += "\t";
+                        }
+                        columnHeader2 += subColumn.headerText;
+                    }
+                } else if (column is AdvancedDataGridColumn) {
+                    if (columnHeader2.length > 0) {
+                        columnHeader2 += "\t";
+                    }
+                    columnHeader2 += column.headerText;
+                }
+            }
+            tabString += columnHeader1 + "\n" + columnHeader2 + "\n" + emptyLine + "\n";
+
+            // parse grid data to tab separated values string
+            var data:Object = grid.dataProvider;
+            if ((data is ArrayCollection) && (data.length > 0)) {
+                var fields:String;
+                for each(var item:Object in data) {
+                    fields = "";
+                    for each (column in columns) {
+                        if (column is AdvancedDataGridColumnGroup) {
+                            for each (subColumn in AdvancedDataGridColumnGroup(column).children) {
+                                if (fields.length > 0) {
+                                    fields += "\t";
+                                }
+                                if (item.hasOwnProperty(column.dataField) && item[column.dataField].hasOwnProperty(subColumn.dataField)) {
+                                    fields += item[column.dataField][subColumn.dataField];
+                                } else {
+                                    fields += "N/A";
+                                }
+
+                            }
+                        } else if (column is AdvancedDataGridColumn) {
+                            if (fields.length > 0) {
+                                fields += "\t";
+                            }
+                            if (item.hasOwnProperty(column.dataField)) {
+                                fields += item[column.dataField];
+                            } else {
+                                fields += "N/A";
+                            }
+                        }
+                    }
+                    tabString += fields + "\n";
+                }
+            }
+
+            System.setClipboard(tabString);
+        }
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:VBox width="100%"
+             horizontalAlign="center" verticalAlign="middle"
+             borderStyle="solid" cornerRadius="10"
+             horizontalGap="4"
+             paddingLeft="10" paddingRight="10"
+             paddingTop="5" paddingBottom="5"
+             backgroundAlpha="0.5" backgroundColor="#FCFBD9">
+        <mx:HBox width="100%" verticalAlign="middle">
+            <mx:Label text="Display values as:" textAlign="right" fontWeight="bold"/>
+            <mx:ComboBox id="comboBoxValueTypes"
+                         change="refresh()"
+                    />
+            <mx:Spacer width="100%"/>
+            <mx:LinkButton id="exportVisualisationButton"
+                           label="Copy"
+                           click="gridToClipboard()"
+                           enabled="true"
+                           toolTip="Copy the table data to the clipboard"
+                           icon="@Embed('/img/icons/seamless-clipboard.gif')"
+                           disabledIcon="@Embed('/img/icons/seamless-clipboard-greyed.gif')"
+                    />
+        </mx:HBox>
+    </mx:VBox>
+
+    <mx:AdvancedDataGrid id="valuesDataGrid"
+                         width="100%" height="100%"
+                         variableRowHeight="true"
+                         headerWordWrap="true"
+            />
+
+</mx:VBox>

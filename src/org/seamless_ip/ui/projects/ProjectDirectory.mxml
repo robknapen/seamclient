@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: ProjectDirectory.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+         width="100%"
+         height="100%"
+         paddingLeft="10"
+         paddingRight="10"
+         paddingTop="10"
+         paddingBottom="10"
+         xmlns:ns="org.seamless_ip.ui.common.*"
+         creationComplete="init()"
+        >
+
+    <mx:Metadata>
+        [Event(name="projectOpened", type="org.seamless_ip.ui.projects.ProjectEvent")]
+    </mx:Metadata>
+
+    <!--
+    View for selecting from the available SEAMLESS projects.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.core.IFlexDisplayObject;
+        import mx.events.CloseEvent;
+        import mx.managers.PopUpManager;
+        import mx.rpc.events.FaultEvent;
+        import mx.rpc.events.ResultEvent;
+
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        // list of all projects
+        [Bindable]
+        private var _projectsList:ArrayCollection = new ArrayCollection();
+        // tracker for server requests in progress
+        [Bindable]
+        public var requestsInProgress:Number = 0;
+        // message about progress state
+        [Bindable]
+        public var progressMessage:String = "Idle";
+        // current active user
+        [Bindable]
+        public var user:User = null;
+
+
+        /**
+         * Intialises the component, called when creation is complete.
+         */
+        public function init():void {
+            refreshList();
+        }
+
+
+        /**
+         * Handles the result from the listAllProjects remote method call.
+         * The returned result is stored in the list and displayed on the
+         * screen.
+         */
+        private function listAllProjectsHandler(event:ResultEvent):void {
+            _projectsList = event.result as ArrayCollection;
+            gc.refresh();
+            updateProgress(true);
+        }
+
+
+        /**
+         * Handles the result from the retrieveProject remote method call
+         * by dispatching a PROJECT_OPENED ProjectEvent.
+         */
+        private function retrieveProjectHandler(event:ResultEvent):void {
+            var project:Project = event.result as Project;
+            updateProgress(true);
+            if (project != null)
+                dispatchEvent(new ProjectEvent(ProjectEvent.PROJECT_OPENED, project));
+        }
+
+
+        /**
+         * Handles the result from the saveProject remote method call.
+         * Whenever a new project is created in this component it is saved
+         * with some initial settings, and eventually triggers this
+         * handler that dispatches a PROJECT_OPENED ProjectEvent for the
+         * new project, so that it will be displayed automatically.
+         */
+        private function saveProjectHandler(event:ResultEvent):void {
+            var project:Project = event.result as Project;
+            updateProgress(true);
+            dispatchEvent(new ProjectEvent(ProjectEvent.PROJECT_OPENED, project));
+        }
+
+
+        /**
+         * Handles the result from the removeProject remote method call.
+         * Retrieves a fresh list of projects from the server.
+         */
+        private function removeProjectHandler(event:ResultEvent):void {
+            updateProgress(true);
+            refreshList();
+        }
+
+
+        /**
+         * Generic handling of a server fault when using remote objects.
+         */
+        private function serverFaultHandler(event:FaultEvent):void {
+            Alert.show("Error retrieving data from server: " + event.fault.faultString, "Server error");
+            updateProgress(true);
+        }
+
+
+        /**
+         * Updates the server request progress state of the component by
+         * tracking the number of started and completed tasks. As long as
+         * there are active tasks (downloads in progress) a progress view
+         * will be made visible.
+         */
+        private function updateProgress(taskCompleted:Boolean = false):void {
+            if (!taskCompleted) {
+                requestsInProgress++;
+            } else {
+                if (requestsInProgress > 0)
+                    requestsInProgress--;
+            }
+
+            if (requestsInProgress > 0) {
+                progressMessage = "Download in progress, " + requestsInProgress + " task(s) remaining";
+                mainView.selectedChild = progressView;
+            } else {
+                progressMessage = "Download completed";
+                mainView.selectedChild = projectsView;
+            }
+        }
+
+
+        /**
+         * Refreshes the list of projects from the server.
+         */
+        private function refreshList():void {
+            if (user != null) {
+                projectService.list(user.id);
+                updateProgress();
+            }
+        }
+
+
+        /**
+         * Opens the selected project, if permitted for the current user.
+         */
+        private function openProject(item:Object):void {
+            if (item != null) {
+                var selectedItem:Object = projectsDataGrid.selectedItem;
+                var projectId:String = selectedItem.id;
+
+                projectService.findById(user.id, projectId);
+                updateProgress();
+            }
+        }
+
+
+        /**
+         * Displays a modal dialog to enter some details for a new
+         * project. Adds an event listener to the dialog to be
+         * able to process results.
+         */
+        private function newProjectDialog():void {
+            var dlg:IFlexDisplayObject = PopUpManager.createPopUp(this, NewProjectDialog, true);
+            dlg.addEventListener(ProjectEvent.PROJECT_CREATE, newProjectHandler);
+            PopUpManager.centerPopUp(dlg);
+        }
+
+
+        /**
+         * Creates an new project.
+         */
+        private function newProjectHandler(event:ProjectEvent):void {
+            var project:Project = event.project;
+            if (project != null) {
+                projectService.save(user.id, project);
+                updateProgress();
+
+                // TODO Quick fix, maybe open User Admin directly, or provide
+                // Project Manager selection in New Project dialog...
+                Alert.show(
+                        "Please do not forget to assign users and permissions to the new project!'",
+                        "Add users and permissions"
+                        );
+            }
+        }
+
+
+        /**
+         * Display alert that confirms removal of the selected project.
+         */
+        private function removeProject(item:Object):void {
+            Alert.show(
+                    "Are you sure you want to remove the project: '" + item.title + "'?",
+                    "Remove project",
+                    3,
+                    null,
+                    removeProjectAlertHandler
+                    );
+        }
+
+
+        /**
+         * Handles click from project remove alert.
+         */
+        private function removeProjectAlertHandler(event:CloseEvent):void {
+            if (event.detail == Alert.YES) {
+                var item:Object = projectsDataGrid.selectedItem;
+                var projectId:String = item.id;
+                projectService.remove(user.id, projectId);
+                updateProgress();
+            }
+        }
+
+
+        /**
+         * Display alert that confirms publishing of the selected project.
+         */
+        private function publishProject(item:Object):void {
+            Alert.show(
+                    "Are you sure you want to publish the project: '" + item.title + "'? " +
+                    "You will not be able to modify the project anymore after it is published!",
+                    "Publish project",
+                    3,
+                    null,
+                    publishProjectAlertHandler
+                    );
+        }
+
+
+        /**
+         * Handles click from project publish alert.
+         */
+        private function publishProjectAlertHandler(event:CloseEvent):void {
+            if (event.detail == Alert.YES) {
+                var item:Object = projectsDataGrid.selectedItem;
+                Project(item).published = true;
+                projectService.save(user.id, Project(item));
+                updateProgress();
+            }
+        }
+
+
+        /**
+         * Checks if the (current) user is allowed to perform a certain
+         * action.
+         */
+        private function allowAction(task:String, right:String, requests:int):Boolean {
+            if (requests == 0) {
+                if ((user != null) && (user.canDo(task, right)))
+                    return true;
+            }
+            return false;
+        }
+
+
+        /**
+         * Checks if the (current) user is allowed to perform a certain
+         * action for the current project.
+         */
+        private function allowProjectAction(task:String, item:Object, requests:int):Boolean {
+            if ((item != null) && item.hasOwnProperty("id") && (requests == 0)) {
+                if ((user != null) && (user.canDoForProject(item.id, task, "PROJECT")))
+                    return true;
+            }
+            return false;
+        }
+			
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Server Access
+     ===========================================================================
+     -->
+
+    <mx:RemoteObject id="projectService"
+                     destination="projectService"
+            >
+        <!-- List<ProjectInfoTO> list(Long userId) -->
+        <mx:method name="list"
+                   fault="serverFaultHandler(event)"
+                   result="listAllProjectsHandler(event)"
+                />
+        <!-- ProjectTO findById(Long userId, Long projectId) -->
+        <mx:method name="findById"
+                   fault="serverFaultHandler(event)"
+                   result="retrieveProjectHandler(event)"
+                />
+        <!-- ProjectTO save(Long userId, ProjectTO item) -->
+        <mx:method name="save"
+                   fault="serverFaultHandler(event)"
+                   result="saveProjectHandler(event)"
+                />
+        <!-- void remove(Long userId, Long projectId) -->
+        <mx:method name="remove"
+                   fault="serverFaultHandler(event)"
+                   result="removeProjectHandler(event)"
+                />
+    </mx:RemoteObject>
+
+    <!--
+     ===========================================================================
+         Effects
+         Used when changing views.
+     ===========================================================================
+     -->
+
+    <mx:Fade id="viewIn" duration="600" alphaFrom="0" alphaTo="1"/>
+    <mx:Fade id="viewOut" duration="100" alphaFrom="1" alphaTo="0"/>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:ViewStack id="mainView"
+                  width="100%" height="100%"
+                  borderStyle="solid" cornerRadius="5"
+                  alpha="0.8"
+                  creationPolicy="all"
+                  paddingLeft="5" paddingRight="5"
+                  paddingBottom="5" paddingTop="5"
+            >
+
+        <ns:ServerProgressView id="progressView"
+                               width="100%"
+                               height="100%"
+                               progressMessage="{progressMessage}"
+                               showEffect="viewIn"
+                               hideEffect="viewOut"
+                />
+
+        <mx:VBox id="projectsView"
+                 width="100%"
+                 height="100%"
+                 showEffect="viewIn"
+                 hideEffect="viewOut"
+                >
+            <mx:HBox width="100%" verticalAlign="bottom">
+
+                <mx:Label
+                        text="Projects currently available on the SEAMLESS server to you, grouped by spatial scales:"/>
+                <mx:Spacer width="100%"/>
+                <mx:Image source="@Embed('/img/icons/seamless-people.gif')"/>
+            </mx:HBox>
+
+            <mx:AdvancedDataGrid id="projectsDataGrid"
+                                 width="100%" height="100%"
+                                 initialize="gc.refresh()"
+                                 wordWrap="true"
+                                 variableRowHeight="true"
+                                 doubleClickEnabled="{allowProjectAction('READ', projectsDataGrid.selectedItem, requestsInProgress)}"
+                                 doubleClick="openProject(projectsDataGrid.selectedItem)"
+                    >
+
+                <mx:dataProvider>
+                    <mx:GroupingCollection id="gc" source="{_projectsList}">
+                        <mx:grouping>
+                            <mx:Grouping>
+                                <mx:GroupingField name="spatialScaleLabel"/>
+                            </mx:Grouping>
+                        </mx:grouping>
+                    </mx:GroupingCollection>
+                </mx:dataProvider>
+
+                <mx:columns>
+                    <mx:AdvancedDataGridColumn dataField="id" headerText="ID"/>
+                    <mx:AdvancedDataGridColumn dataField="title" headerText="Project"
+                                               itemRenderer="org.seamless_ip.ui.projects.ProjectItemRenderer"
+                            />
+                    <mx:AdvancedDataGridColumn dataField="projectDescription" headerText="Description"
+                                               showDataTips="true" dataTipField="problemDescription"
+                                               itemRenderer="org.seamless_ip.ui.projects.ProjectItemRenderer"
+                            />
+                    <mx:AdvancedDataGridColumn dataField="roles" headerText="Project Roles"/>
+                </mx:columns>
+
+            </mx:AdvancedDataGrid>
+
+        </mx:VBox>
+
+    </mx:ViewStack>
+
+    <mx:HBox width="100%">
+        <mx:LinkButton id="createProjectButton"
+                       label="New..."
+                       enabled="{allowAction('CREATE', 'PROJECT', requestsInProgress)}"
+                       click="newProjectDialog()"
+                       toolTip="Create a new project"
+                       icon="@Embed('/img/icons/seamless-file.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-file-greyed.gif')"
+                />
+        <mx:LinkButton id="openProjectButton"
+                       label="Open..."
+                       enabled="{allowProjectAction('READ', projectsDataGrid.selectedItem, requestsInProgress)}"
+                       click="openProject(projectsDataGrid.selectedItem)"
+                       toolTip="Open the selected project"
+                       icon="@Embed('/img/icons/seamless-folder.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-folder-greyed.gif')"
+                />
+        <mx:LinkButton id="refreshListButton"
+                       label="Refresh"
+                       enabled="{requestsInProgress == 0}"
+                       click="refreshList()"
+                       toolTip="Synchronise the list of projects with the server"
+                       icon="@Embed('/img/icons/seamless-sync.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-sync-greyed.gif')"
+                />
+        <mx:Spacer width="100%"/>
+        <mx:LinkButton id="publishProjectButton"
+                       label="Publish..."
+                       click="{publishProject(projectsDataGrid.selectedItem)}"
+                       enabled="{allowProjectAction('PUBLISH', projectsDataGrid.selectedItem, requestsInProgress)}"
+                       toolTip="Publish the selected project (you will not be able to modify it anymore!)"
+                       icon="@Embed('/img/icons/seamless-publish.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-publish-greyed.gif')"
+                />
+        <mx:LinkButton id="removeProjectButton"
+                       label="Remove..."
+                       click="{removeProject(projectsDataGrid.selectedItem)}"
+                       enabled="{allowProjectAction('DELETE', projectsDataGrid.selectedItem, requestsInProgress)}"
+                       toolTip="Remove the selected project and all its data"
+                       icon="@Embed('/img/icons/seamless-delete.gif')"
+                       disabledIcon="@Embed('/img/icons/seamless-delete-greyed.gif')"
+                />
+    </mx:HBox>
+
+</mx:VBox>

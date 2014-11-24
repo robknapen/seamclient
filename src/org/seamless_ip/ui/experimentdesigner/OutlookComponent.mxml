@@ -1,0 +1,1069 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: OutlookComponent.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+           width="100%" height="100%"
+           creationComplete="{init()}"
+           xmlns:ns="org.seamless_ip.ui.common.*"
+           >
+    <mx:Script>
+	<![CDATA[
+		import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.controls.dataGridClasses.DataGridColumn;
+        import mx.formatters.NumberFormatter;
+        import mx.rpc.events.FaultEvent;
+        import mx.rpc.events.ResultEvent;
+        import mx.rpc.remoting.mxml.RemoteObject;
+        import mx.utils.ObjectUtil;
+
+        import org.seamless_ip.services.transferobjects.capri.BiofuelDemand;
+        import org.seamless_ip.services.transferobjects.capri.DemandShift;
+        import org.seamless_ip.services.transferobjects.capri.EnergyPrice;
+        import org.seamless_ip.services.transferobjects.capri.ExchangeRates;
+        import org.seamless_ip.services.transferobjects.capri.InflationRate;
+        import org.seamless_ip.services.transferobjects.capri.Modulation;
+        import org.seamless_ip.services.transferobjects.capri.YieldGrowth;
+        import org.seamless_ip.services.transferobjects.seamproj.Outlook;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+        import org.seamless_ip.services.transferobjects.utils.IBaseLineValue;
+        import org.seamless_ip.ui.common.DataGridRowColor;
+
+        [Bindable] public var myExchangeRates:ArrayCollection;
+        [Bindable] public var myBioFuelDemand:ArrayCollection;
+        [Bindable] public var myInflationrate:ArrayCollection;
+        [Bindable] public var myEnergyPrice:ArrayCollection;
+        [Bindable] public var myYieldGrowth:ArrayCollection;
+        [Bindable] public var myDemandShifts:ArrayCollection;
+        [Bindable] public var mySupplyShifts:ArrayCollection;
+        [Bindable] public var myModulation:ArrayCollection;
+
+        [Bindable] public var myDemandShiftProductGroups:ArrayCollection;
+        [Bindable] public var myDemandShiftCountries:ArrayCollection;
+        
+        [Bindable] public var mySupplyShiftProductGroups:ArrayCollection;
+        [Bindable] public var mySupplyShiftCountries:ArrayCollection;
+
+        [Bindable] private var _outlook:Outlook;
+        [Bindable] private var _user:User = new User();
+        [Bindable] private var _project:Project;
+
+        [Bindable] private var _showCtrl:Boolean = false;
+        [Bindable] private var _modelChainName:String = "FSSIMCAPRI";
+
+        private var _ro:RemoteObject = new RemoteObject("outlookService");
+        private var _experimentID:Number = NaN;
+        private var _nb2d:NumberFormatter;
+
+        private var _demandShiftProductGroupMacros:Dictionary = new Dictionary();
+        private var _demandShiftCountryMacros:Dictionary = new Dictionary();
+        private var _supplyShiftProductGroupMacros:Dictionary = new Dictionary();
+        private var _supplyShiftCountryMacros:Dictionary = new Dictionary();
+
+
+        public function set user(user:User):void {
+            _user = user;
+        }
+
+
+        public function set showCtrl(showCtrl:Boolean):void {
+            _showCtrl = showCtrl;
+        }
+
+
+        public function set project(project:Project):void {
+            _project = project;
+        }
+        
+        public function get outlook():Outlook {
+            return _outlook;
+        }
+
+        
+        public function set outlook(outlook: Outlook): void {
+            _outlook = outlook;
+        }
+
+
+        public function set modelChain(name:String):void {
+            _modelChainName = name;
+            enableTabs();
+        }
+
+
+        public function set experimentID(experimentID:Number):void {
+            _experimentID = experimentID;
+        }
+
+
+        private function init():void {
+            enableTabs();
+            _nb2d = new NumberFormatter();
+            _nb2d.precision = 2;
+        }
+
+
+        private function isEditable():Boolean {
+            var ret:Boolean = _user.canDoForProject(_project.id, "UPDATE", "EXPERIMENT")
+            return (ret );
+        }
+
+
+        public function editable():void {
+            var editable:Boolean = isEditable();
+            dgBioFuelDemand.editable = editable;
+            dgDemandShifts.editable = editable;
+            dgSupplyShifts.editable = editable;
+            dgEnergyPrice.editable = editable;
+            dgExchangerates.editable = editable;
+            dgInflation.editable = editable;
+            dgModulation.editable = editable;
+            dgYieldGrowth.editable = editable;
+            updateDemandshift.enabled = editable;
+        }
+
+
+        private function enableTabs():void {
+            tabBiofuelDemand.enabled = false;
+            tabDemandshifts.enabled = false;
+            tabSupplyShifts.enabled = false;
+            tabEnergyPrices.enabled = false;
+            tabExchangeRates.enabled = false;
+            tabInfaltionrate.enabled = false;
+            tabModulation.enabled = false;
+            tabYieldGrowth.enabled = false;
+
+            // Enable FSSIM screens
+            if (_modelChainName.toUpperCase().search("FSSIM") != -1) {
+                // tabBiofuelDemand.enabled = false;
+                // tabDemandshifts.enabled = false;
+                tabEnergyPrices.enabled = true;
+                // tabExchangeRates.enabled = false;
+                tabInfaltionrate.enabled = true;
+                tabModulation.enabled = true;
+                tabYieldGrowth.enabled = true;
+            }
+
+            // Enable CAPRI screens
+            if (_modelChainName.toUpperCase().search("CAPRI") != -1) {
+                tabBiofuelDemand.enabled = true;
+                tabDemandshifts.enabled = true;
+                tabSupplyShifts.enabled = true;
+                tabEnergyPrices.enabled = true;
+                tabExchangeRates.enabled = true;
+                tabInfaltionrate.enabled = true;
+                tabModulation.enabled = true;
+                tabYieldGrowth.enabled = true;
+            }
+
+            // Override tooltip on not enabled tabs
+            var notSuported:String = "The modelchain of the experiment does not suport this outlook option";
+            if (tabBiofuelDemand.enabled == false) tabBiofuelDemand.toolTip = notSuported;
+            if (tabDemandshifts.enabled == false) tabDemandshifts.toolTip = notSuported;
+            if (tabSupplyShifts.enabled == false) tabDemandshifts.toolTip = notSuported;
+            if (tabEnergyPrices.enabled == false) tabEnergyPrices.toolTip = notSuported;
+            if (tabExchangeRates.enabled == false) tabExchangeRates.toolTip = notSuported;
+            if (tabInfaltionrate.enabled == false) tabInfaltionrate.toolTip = notSuported;
+            if (tabModulation.enabled == false) tabModulation.toolTip = notSuported;
+            if (tabYieldGrowth.enabled == false) tabYieldGrowth.toolTip = notSuported;
+
+            // Select the first enabled tab.
+            var canvasIndex:int = 0;
+            for each (var p:Canvas in view.getChildren()) {
+                if (p.enabled) {
+                    view.selectedIndex = canvasIndex;
+                    view.invalidateDisplayList();
+                    break;
+                }
+                canvasIndex += 1;
+            }
+        }
+
+
+        private function setupCall(methodname:String, callback:Function):void {
+            _ro.removeEventListener(FaultEvent.FAULT, readDataFaultHandler);
+            _ro.removeEventListener(ResultEvent.RESULT, getOutlook_callback);
+            _ro.removeEventListener(ResultEvent.RESULT, editOutlook_callback);
+            _ro.getOperation(methodname).addEventListener(ResultEvent.RESULT, callback, false, 0, true);
+            _ro.getOperation(methodname).addEventListener(FaultEvent.FAULT, readDataFaultHandler, false, 0, true);
+        }
+
+
+        public function getOutlook_callback(event:ResultEvent):void {
+            outlook = event.result as Outlook;
+
+            myExchangeRates = outlook.exchangeRates;
+            myBioFuelDemand = outlook.biofuelDemands;
+            myInflationrate = outlook.inflationRates;
+            myEnergyPrice = outlook.energyPrice;
+            myYieldGrowth = outlook.yieldGrowth;
+            myDemandShifts = outlook.demandShifts;
+            mySupplyShifts = outlook.supplyShifts;
+            myModulation = outlook.modulations;
+
+            initialiseSupplyAndDemandShiftMacros();
+
+            dispatchEvent(new ExperimentDesignerEvent(ExperimentDesignerEvent.EXPERIMENT_OUTLOOK_LOAD_READY));
+        }
+
+
+        public function editOutlook_callback(event:ResultEvent):void {
+            outlook = event.result as Outlook;
+            dispatchEvent(new ExperimentDesignerEvent(ExperimentDesignerEvent.EXPERIMENT_OUTLOOK_SAVE_READY));
+        }
+
+
+        public function readDataFaultHandler(event:FaultEvent):void {
+            Alert.show(event.message.toString(), "Sorry, there was a problem retrieving data from the SEAMLESS server.");
+        }
+        
+        
+        public function getOutlook():void {
+            editable();
+            setupCall("findById", getOutlook_callback);
+            _ro.findById(_experimentID);
+        }
+
+
+        public function updateOutlook():void {
+            setupCall("updateOutlook", editOutlook_callback);
+            _ro.updateOutlook(outlook);
+        }
+
+
+        private function getBaselineValue(item:Object, column:DataGridColumn):String {
+            return _nb2d.format(((IBaseLineValue)(item)).BaseLineValue);
+        }
+
+
+		/**
+		 * Loop through the items in the specified ArrayCollection, and for
+		 * every item that has a "value" property and that implements the
+		 * IBaseLineValue interface, change the value to the BaseLineValue.
+		 */
+		private function resetToBaseline(items:ArrayCollection):void {
+			for each (var item:Object in items) {
+				if ((item.hasOwnProperty("value")) && (item is IBaseLineValue)) {
+					item["value"] = IBaseLineValue(item).BaseLineValue;
+				}
+			}
+		}
+
+		
+		/**
+		 * Reset all values of the active Outlook back to the baseline values.
+		 */
+        private function reset2BaselineValues():void {
+        	resetToBaseline(outlook.biofuelDemands);
+        	resetToBaseline(outlook.demandShifts);
+        	resetToBaseline(outlook.supplyShifts);
+        	resetToBaseline(outlook.energyPrice);
+        	resetToBaseline(outlook.exchangeRates);
+        	resetToBaseline(outlook.inflationRates);
+        	resetToBaseline(outlook.modulations);
+        	resetToBaseline(outlook.yieldGrowth);
+        }
+
+
+		/**
+		 * Return a colour values based on the specified object and input
+		 * colour. The item is expected to implement the IBaseLineValue
+		 * interface and to have a property "value". Otherwise the input
+		 * colour is simply returned.
+		 */
+		private function rowColor(item:Object, color:uint):uint {
+			var value:Number;
+			var baselineValue:Number;
+			
+			if ((item.hasOwnProperty("value")) && (item is IBaseLineValue)) {
+				value = item["value"];
+				baselineValue = IBaseLineValue(item).BaseLineValue;
+			
+				// specific row coloring rules
+				if (item is BiofuelDemand) {
+		            if (value > baselineValue * 2) {
+		                return 0xADFF2F;
+		            }
+				}
+	
+				if ((item is DemandShift) || (item is SupplyShift)) {
+		            if (value > 50 || value < -50) {
+		                return 0xADFF2F;
+	    	        }
+				}
+	
+				// standard row coloring
+	            return DataGridRowColor.DiffColor(value, baselineValue, color);
+	  		}
+	  		
+	  		return color;
+		}
+
+
+		/**
+		 * Initialise the demand shift and the supply shift macro functions.
+		 * The parameters of these functions are edited by the user, and used
+		 * to calculate values for the shifts based on the baseline values.
+		 * Lists of relevant countries and product groups are derived from the
+		 * demand shifts and supply shifts.
+		 */
+        private function initialiseSupplyAndDemandShiftMacros():void {
+        	var key:Object;
+        	
+        	// initialise macros for the demand shifts
+            for each(var ds:DemandShift in myDemandShifts) {
+                if (_demandShiftCountryMacros[ds.country.id] == null) {
+                    _demandShiftCountryMacros[ds.country.id] = new CapriCountryMacro(ds.country, 0, 100);
+                }
+                if (_demandShiftProductGroupMacros[ds.productGroup.id] == null) {
+                    _demandShiftProductGroupMacros[ds.productGroup.id] = new CapriProductGroupMacro(ds.productGroup, 0, 100);
+                }
+            }
+
+            myDemandShiftProductGroups = new ArrayCollection();
+            
+            for each (key in _demandShiftProductGroupMacros) {
+                myDemandShiftProductGroups.addItem(key);
+            }
+
+            myDemandShiftCountries = new ArrayCollection();
+            for each (key in _demandShiftCountryMacros) {
+                myDemandShiftCountries.addItem(key);
+            }
+
+        	// initialise macros for the supply shifts
+            for each(var ss:SupplyShift in mySupplyShifts) {
+                if (_supplyShiftCountryMacros[ss.country.id] == null) {
+                    _supplyShiftCountryMacros[ss.country.id] = new CapriCountryMacro(ss.country, 0, 100);
+                }
+                if (_supplyShiftProductGroupMacros[ss.productGroup.id] == null) {
+                    _supplyShiftProductGroupMacros[ss.productGroup.id] = new CapriProductGroupMacro(ss.productGroup, 0, 100);
+                }
+            }
+
+			// Theoretically the product groups and countries should be the
+			// same for demand shifts and supply shifts. However to not make
+			// too many modifications to the original code lets give supply
+			// shifts their own collections.
+            
+            mySupplyShiftProductGroups = new ArrayCollection();
+            for each (key in _supplyShiftProductGroupMacros) {
+                mySupplyShiftProductGroups.addItem(key);
+            }
+
+            mySupplyShiftCountries = new ArrayCollection();
+            for each (key in _supplyShiftCountryMacros) {
+                mySupplyShiftCountries.addItem(key);
+            }
+        }
+
+
+		/**
+		 * Execute the demand shift functions with the parameters set by the
+		 * user, to calculate values based on the baseline values.
+		 */
+        private function executeDemandShiftMacros():void {
+            for each (var demandShift:DemandShift in myDemandShifts) {
+                var val:Number;
+                if (demandMacroBaseline.selected) {
+                    val = demandShift.BaseLineValue;
+                } else {
+                    val = demandShift.value;
+                }
+                var ccm:CapriCountryMacro = _demandShiftCountryMacros[demandShift.country.id];
+                var cpgm:CapriProductGroupMacro = _demandShiftProductGroupMacros[demandShift.productGroup.id];
+                demandShift.value = val * ((ccm.rel * 0.01) * (cpgm.rel * 0.01)) + (ccm.abs + cpgm.abs);
+            }
+        }
+
+
+		/**
+		 * Execute the supply shift functions with the parameters set by the
+		 * user, to calculate values based on the baseline values.
+		 */
+        private function executeSupplyShiftMacros():void {
+            for each (var supplyShift:SupplyShift in mySupplyShifts) {
+                var val:Number;
+                if (supplyMacroBaseline.selected) {
+                    val = supplyShift.BaseLineValue;
+                } else {
+                    val = supplyShift.value;
+                }
+                var ccm:CapriCountryMacro = _supplyShiftCountryMacros[supplyShift.country.id];
+                var cpgm:CapriProductGroupMacro = _supplyShiftProductGroupMacros[supplyShift.productGroup.id];
+                supplyShift.value = val * ((ccm.rel * 0.01) * (cpgm.rel * 0.01)) + (ccm.abs + cpgm.abs);
+            }
+        }
+
+	]]>
+</mx:Script>
+    <mx:Script source="GridFunctions.as"/>
+
+    <mx:NumberFormatter id="nFtwoDecimals" precision="2"/>
+
+    <mx:Panel
+            layout="vertical"
+            height="100%" width="100%">
+        <mx:TabBar id="toolBarBJOutlook"
+                   dataProvider="view" width="100%"/>
+        <mx:ViewStack id="view" width="100%" height="100%" creationPolicy="all">
+
+            <!-- Exchange rates -->
+            <mx:Canvas width="100%" height="100%"
+                       label="Exchange rates" id="tabExchangeRates"
+                       toolTip="Here you can change the relative exchange rate between trading partners. 100% means baseline exchange rate (implicit to CAPRI).">
+                <mx:Panel layout="horizontal" height="100%" width="100%">
+                    <mx:VBox width="100%" height="100%">
+                        <mx:Script>
+					<![CDATA[
+					private function e_fromCountry(item:Object, column:DataGridColumn):String {
+                                return ((ExchangeRates)(item)).fromCountryAggregate.name;
+                            }
+
+                            private function sortExchangeRatesFromCountryAggregate(obj1:ExchangeRates, obj2:ExchangeRates):int {
+                                return ObjectUtil.stringCompare(obj1.fromCountryAggregate.name + obj1.toCountryAggregate.name, obj2.fromCountryAggregate.name + obj2.toCountryAggregate.name);
+                            }
+
+                            private function e_toCountry(item:Object, column:DataGridColumn):String {
+                                return ((ExchangeRates)(item)).toCountryAggregate.name;
+                            }
+
+                            private function sortExchangeRatesToCountryAggregate(obj1:ExchangeRates, obj2:ExchangeRates):int {
+                                return ObjectUtil.stringCompare(obj1.toCountryAggregate.name + obj1.fromCountryAggregate.name, obj2.toCountryAggregate.name + obj2.fromCountryAggregate.name);
+                            }
+   					]]>
+					</mx:Script>
+                        <ns:DataGridRowColor id="dgExchangerates"
+                                             width="100%" height="100%"
+                                             dataProvider="{myExchangeRates}"
+                                             editable="true"
+                                             itemEditEnd="{validatGridInput(event,50,150,dgExchangerates);}"
+                                             rowColorFunction="rowColor">
+                            <ns:columns>
+                                <ns:DataGridColumnConceptSort headerText="Trading partner"
+                                                              editable="false"
+                                                              sortDescending="true"
+                                                              labelFunction="e_fromCountry"
+                                                              sortCompareFunction="sortExchangeRatesFromCountryAggregate"/>
+                                <ns:DataGridColumnConceptSort headerText="Trading partner"
+                                                              editable="false"
+                                                              labelFunction="e_toCountry"
+                                                              sortCompareFunction="sortExchangeRatesToCountryAggregate"/>
+                                <ns:FormattedDataGridColomn percision="2" headerText="Value (%)"
+                                                            editable="true"
+                                                            dataField="value"
+                                                            fontWeight="bold"
+                                                            textAlign="right"/>
+                                <ns:FormattedDataGridColomn percision="2" headerText="Baseline Value (%)"
+                                                            editable="false"
+                                                            labelFunction="getBaselineValue"
+                                                            textAlign="right"/>
+                            </ns:columns>
+                        </ns:DataGridRowColor>
+                        <mx:HBox width="100%" horizontalAlign="right">
+                            <mx:Button label="Reset to baseline"
+                                       click="{resetToBaseline(outlook.exchangeRates)}"
+                                       enabled="{isEditable()}"
+                                       visible="{_showCtrl}"
+                                       includeInLayout="{_showCtrl}"/>
+                        </mx:HBox>
+                    </mx:VBox>
+                </mx:Panel>
+            </mx:Canvas>
+
+            <!-- Demand shifts -->
+
+            <mx:Canvas id="tabDemandshifts"
+                       width="100%" height="100%"
+                       label="Demand shifts"
+                       toolTip="Here you can introduce demand shifts for agricultural products in non-EU countries. The standard value is 0%. If you set the demand shift for wheat in Brazil for example to 10%, the demand function will be shifted by 10% of the baseline value to the right.">
+                <mx:Script>
+		<![CDATA[
+			 private function d_country(item:Object, column:DataGridColumn):String {
+                        return (DemandShift)(item).country.name;
+                    }
+
+                    private function sortDemandShiftCountry(obj1:DemandShift, obj2:DemandShift):int {
+                        return ObjectUtil.stringCompare(obj1.country.name + obj1.productGroup.label_en, obj2.country.name + obj2.productGroup.label_en);
+                    }
+
+                    private function d_product(item:Object, column:DataGridColumn):String {
+                        return ((DemandShift)(item)).productGroup.label_en;
+                    }
+
+                    private function sortDemandShiftProductGroup(obj1:DemandShift, obj2:DemandShift):int {
+                        return ObjectUtil.stringCompare(obj1.productGroup.label_en + obj1.country.name, obj2.productGroup.label_en + obj2.country.name);
+                    }
+		
+		
+		]]>
+		</mx:Script>
+                <mx:Panel layout="horizontal" height="100%" width="100%">
+                    <mx:HBox width="100%" height="100%">
+                        <mx:HDividedBox width="100%" height="100%">
+                            <mx:VBox height="100%" minWidth="200"
+                                     visible="{_showCtrl}"
+                                     includeInLayout="{_showCtrl}">
+                                <mx:HBox width="100%" horizontalAlign="right">
+                                    <mx:RadioButton label="Baseline" selected="true" groupName="demandMacroGroup"
+                                                    id="demandMacroBaseline"/>
+                                    <mx:RadioButton label="Value" groupName="demandMacroGroup"/>
+                                </mx:HBox>
+
+                                <mx:TabBar id="q" dataProvider="viewDemand" width="100%"/>
+                                <mx:ViewStack id="viewDemand" width="100%" height="100%">
+
+                                    <mx:Canvas label="Product" height="100%" width="100%">
+                                        <mx:DataGrid dataProvider="{myDemandShiftProductGroups}"
+                                                     width="100%" height="100%"
+                                                     editable="true">
+                                            <mx:columns>
+                                                <ns:DataGridColumnConceptSort headerText="Product"
+                                                                              labelFunction="CapriProductGroupMacro.labelProductGroup"
+                                                                              sortCompareFunction="CapriProductGroupMacro.sortProductGroup"
+                                                                              editable="false"/>
+                                                <mx:DataGridColumn headerText="Abs"
+                                                                   dataField="abs"
+                                                                   fontWeight="bold"
+                                                                   editable="true"/>
+                                                <mx:DataGridColumn headerText="Rel"
+                                                                   dataField="rel"
+                                                                   fontWeight="bold"
+                                                                   editable="true"/>
+                                            </mx:columns>
+                                        </mx:DataGrid>
+                                    </mx:Canvas>
+                                    <mx:Canvas label="Country" height="100%" width="100%">
+                                        <mx:DataGrid dataProvider="{myDemandShiftCountries}"
+                                                     width="100%" height="100%"
+                                                     editable="true">
+                                            <mx:columns>
+                                                <ns:DataGridColumnConceptSort headerText="Country"
+                                                                              labelFunction="CapriCountryMacro.labelCountry"
+                                                                              editable="false"
+                                                                              sortCompareFunction="CapriCountryMacro.sortCountry"/>
+                                                <mx:DataGridColumn headerText="Abs"
+                                                                   dataField="abs"
+                                                                   fontWeight="bold"
+                                                                   editable="true"/>
+                                                <mx:DataGridColumn headerText="Rel"
+                                                                   dataField="rel"
+                                                                   fontWeight="bold"
+                                                                   editable="true"/>
+                                            </mx:columns>
+                                        </mx:DataGrid>
+                                    </mx:Canvas>
+                                </mx:ViewStack>
+                                <mx:HBox width="100%" horizontalAlign="right">
+                                    <mx:Button id="updateDemandshift" label="Update"
+                                               click="{executeDemandShiftMacros()}"/>
+                                </mx:HBox>
+
+
+                            </mx:VBox>
+                            <ns:DataGridRowColor width="70%" height="100%"
+                                                 id="dgDemandShifts"
+                                                 editable="true"
+                                                 dataProvider="{myDemandShifts}"
+                                                 itemEditEnd="validatGridInput(event,-50,50,dgDemandShifts);"
+                                                 rowColorFunction="rowColor"
+                                    >
+                                <ns:columns>
+                                    <ns:DataGridColumnConceptSort headerText="Country"
+                                                                  editable="false"
+                                                                  sortable="true"
+                                                                  sortDescending="true"
+                                                                  labelFunction="d_country"
+                                                                  sortCompareFunction="sortDemandShiftCountry"
+                                            />
+                                    <ns:DataGridColumnConceptSort headerText="Product"
+                                                                  editable="false"
+                                                                  sortDescending="true"
+                                                                  labelFunction="d_product"
+                                                                  sortCompareFunction="sortDemandShiftProductGroup"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Value (%)"
+                                                                editable="true"
+                                                                dataField="value"
+                                                                fontWeight="bold"
+                                                                textAlign="right"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Baseline Value (%)"
+                                                                editable="false"
+                                                                labelFunction="getBaselineValue"
+                                                                textAlign="right"/>
+                                </ns:columns>
+                            </ns:DataGridRowColor>
+                        </mx:HDividedBox>
+                    </mx:HBox>
+                </mx:Panel>
+            </mx:Canvas>
+
+
+<!-- Supply Shifts Input -->
+
+        <mx:Canvas id="tabSupplyShifts"
+			width="100%" height="100%"
+            label="Supply shifts"
+            toolTip="Here you can introduce supply shifts for agricultural products in non-EU countries. The standard value is 0%. If you set the supply shift for wheat in Brazil for example to 10%, the supply function will be shifted by 10% of the baseline value to the right.">
+	        <mx:Script>
+				<![CDATA[
+					import org.seamless_ip.services.transferobjects.capri.SupplyShift;
+					private function getSupplyShiftCountryName(item:Object, column:DataGridColumn):String {
+					    return (SupplyShift)(item).country.name;
+					}
+		
+		            private function sortSupplyShiftByCountry(obj1:SupplyShift, obj2:SupplyShift):int {
+		                return ObjectUtil.stringCompare(
+		                	obj1.country.name + obj1.productGroup.label_en,
+		                	obj2.country.name + obj2.productGroup.label_en);
+		            }
+		
+		            private function getSupplyShiftProductGroupName(item:Object, column:DataGridColumn):String {
+		                return ((SupplyShift)(item)).productGroup.label_en;
+		            }
+		
+		            private function sortSupplyShiftByProductGroup(obj1:SupplyShift, obj2:SupplyShift):int {
+		                return ObjectUtil.stringCompare(
+		                	obj1.productGroup.label_en + obj1.country.name, 
+		                	obj2.productGroup.label_en + obj2.country.name);
+		            }
+				]]>
+			</mx:Script>
+		
+            <mx:Panel layout="horizontal" height="100%" width="100%">
+                <mx:HBox width="100%" height="100%">
+                    <mx:HDividedBox width="100%" height="100%">
+                        <mx:VBox height="100%" minWidth="200"
+                            visible="{_showCtrl}"
+                            includeInLayout="{_showCtrl}"
+                            >
+                            <mx:HBox width="100%" horizontalAlign="right">
+                                <mx:RadioButton
+                                    id="supplyMacroBaseline"
+                                	label="Baseline" 
+                                	selected="true" 
+                                	groupName="supplyMacroGroup"
+                                    />
+                                <mx:RadioButton
+                                	label="Value" 
+                                	groupName="supplyMacroGroup"
+                                	/>
+                            </mx:HBox>
+
+                            <mx:TabBar id="tabBarSupply" dataProvider="viewSupply" width="100%"/>
+                            <mx:ViewStack id="viewSupply" width="100%" height="100%">
+
+                                <mx:Canvas label="Product" height="100%" width="100%">
+                                    <mx:DataGrid 
+                                    	dataProvider="{mySupplyShiftProductGroups}"
+                                        width="100%" height="100%"
+                                        editable="true"
+                                        >
+                                        <mx:columns>
+                                            <ns:DataGridColumnConceptSort 
+                                            	headerText="Product"
+                                                labelFunction="CapriProductGroupMacro.labelProductGroup"
+                                                sortCompareFunction="CapriProductGroupMacro.sortProductGroup"
+                                                editable="false"
+                                                />
+                                            <mx:DataGridColumn headerText="Abs" dataField="abs" fontWeight="bold" editable="true"/>
+                                            <mx:DataGridColumn headerText="Rel" dataField="rel" fontWeight="bold" editable="true"/>
+                                        </mx:columns>
+                                    </mx:DataGrid>
+                                </mx:Canvas>
+                                
+                                <mx:Canvas label="Country" height="100%" width="100%">
+                                    <mx:DataGrid dataProvider="{mySupplyShiftCountries}"
+	                                    width="100%" height="100%"
+	                                    editable="true"
+	                                    >
+                                        <mx:columns>
+                                            <ns:DataGridColumnConceptSort
+                                            	headerText="Country"
+                                                labelFunction="CapriCountryMacro.labelCountry"
+                                                sortCompareFunction="CapriCountryMacro.sortCountry"
+                                                editable="false"
+                                                />
+                                            <mx:DataGridColumn headerText="Abs" dataField="abs" fontWeight="bold" editable="true"/>
+                                            <mx:DataGridColumn headerText="Rel" dataField="rel" fontWeight="bold" editable="true"/>
+                                        </mx:columns>
+                                    </mx:DataGrid>
+                                </mx:Canvas>
+                            </mx:ViewStack>
+                            
+                            <mx:HBox width="100%" horizontalAlign="right">
+                                <mx:Button id="updateSupplyShift" 
+                                	label="Update"
+                                    click="{executeSupplyShiftMacros()}"
+                                    />
+                            </mx:HBox>
+
+                        </mx:VBox>
+                        
+                        <ns:DataGridRowColor id="dgSupplyShifts" 
+                        	width="70%" height="100%"
+							editable="true"
+                            dataProvider="{mySupplyShifts}"
+                            itemEditEnd="validatGridInput(event, -50, 50, dgSupplyShifts)"
+                            rowColorFunction="rowColor"
+                            >
+                            <ns:columns>
+                                <ns:DataGridColumnConceptSort 
+                                	headerText="Country"
+                                    editable="false"
+                                    sortable="true"
+                                    sortDescending="true"
+                                    labelFunction="getSupplyShiftCountryName"
+                                    sortCompareFunction="sortSupplyShiftByCountry"
+                                    />
+                                <ns:DataGridColumnConceptSort
+                                	headerText="Product"
+                                    editable="false"
+                                    sortDescending="true"
+                                    labelFunction="getSupplyShiftProductGroupName"
+									sortCompareFunction="sortSupplyShiftByProductGroup"
+									/>
+                                <ns:FormattedDataGridColomn 
+                                	percision="2" 
+                                	headerText="Value (%)"
+                                    editable="true"
+									dataField="value"
+                                    fontWeight="bold"
+                                    textAlign="right"
+                                    />
+                                <ns:FormattedDataGridColomn
+                                	percision="2"
+                                	headerText="Baseline Value (%)"
+                                    editable="false"
+                                    labelFunction="getBaselineValue"
+                                    textAlign="right"
+                                    />
+                            </ns:columns>
+                        </ns:DataGridRowColor>
+                    </mx:HDividedBox>
+                </mx:HBox>
+            </mx:Panel>
+        </mx:Canvas>
+        
+<!-- End Supply Shifts Input -->
+
+            <!-- Bio fuel demand -->
+            <mx:Canvas id="tabBiofuelDemand"
+                       width="100%" height="100%" label="Biofuel demand"
+                       toolTip="Here you can set the demand for agricultural products from the biofuel industry.">
+                <mx:Script>
+		<![CDATA[
+		
+			private function b_fromCountry(item:Object, column:DataGridColumn):String {
+                        return ((BiofuelDemand)(item)).country.name;
+                    }
+
+                    private function sortBiofuelDemandCountry(obj1:BiofuelDemand, obj2:BiofuelDemand):int {
+                        return ObjectUtil.stringCompare(obj1.country.name + obj1.productGroup.label_en, obj2.country.name + obj2.productGroup.label_en);
+                    }
+
+                    private function b_product(item:Object, column:DataGridColumn):String {
+                        return ((BiofuelDemand)(item)).productGroup.label_en;
+                    }
+
+                    private function sortBiofuelDemandProductGroup(obj1:BiofuelDemand, obj2:BiofuelDemand):int {
+                        return ObjectUtil.stringCompare(obj1.productGroup.label_en + obj1.country.name, obj2.productGroup.label_en + obj2.country.name);
+                    }
+		]]>
+	</mx:Script>
+                <mx:Panel layout="horizontal" height="100%" width="100%"
+                        >
+                    <mx:VBox width="100%" height="100%">
+                        <ns:DataGridRowColor id="dgBioFuelDemand"
+                                             width="100%" height="100%"
+                                             editable="true"
+                                             dataProvider="{myBioFuelDemand}"
+                                             itemEditEnd="{validatGridInput(event,0,Number.MAX_VALUE,dgBioFuelDemand);}"
+                                             rowColorFunction="rowColor">
+                            <ns:columns>
+                                <ns:DataGridColumnConceptSort headerText="Country"
+                                                              labelFunction="b_fromCountry"
+                                                              sortDescending="true"
+                                                              editable="false"
+                                                              sortCompareFunction="sortBiofuelDemandCountry"/>
+                                <ns:DataGridColumnConceptSort headerText="Product"
+                                                              labelFunction="b_product"
+                                                              editable="false"
+                                                              sortCompareFunction="sortBiofuelDemandProductGroup"/>
+                                <ns:FormattedDataGridColomn percision="2" headerText="Value (1000 t)"
+                                                            dataField="value"
+                                                            editable="true"
+                                                            fontWeight="bold"
+                                                            textAlign="right"
+
+                                        />
+                                <ns:FormattedDataGridColomn percision="2" headerText="Baseline value (1000 t)"
+                                                            editable="false"
+                                                            dataField="BaseLineValue"
+                                                            textAlign="right"/>
+                            </ns:columns>
+                        </ns:DataGridRowColor>
+                        <mx:HBox width="100%" horizontalAlign="right">
+                            <mx:Button label="Reset to baseline"
+                                       click="{resetToBaseline(outlook.biofuelDemands)}"
+                                       enabled="{isEditable()}"
+                                       visible="{_showCtrl}"
+                                       includeInLayout="{_showCtrl}"/>
+                        </mx:HBox>
+                    </mx:VBox>
+                </mx:Panel>
+            </mx:Canvas>
+
+            <!--Inflation -->
+
+            <mx:Canvas id="tabInfaltionrate"
+                       width="100%" height="100%" label="Inflation"
+                       toolTip="Here the yearly inflation rate per country aggregate can be changed. Within a country aggregate (e.g. EU15) the same rate is assumed.">
+                <mx:Script>
+		<![CDATA[
+		
+			private function i_country(item:Object, column:DataGridColumn):String {
+                        return ((InflationRate)(item)).countryAggregate.name;
+                    }
+
+                    private function sortInflationRateCountry(obj1:InflationRate, obj2:InflationRate):int {
+                        return ObjectUtil.stringCompare(obj1.countryAggregate.name, obj2.countryAggregate.name);
+                    }
+		
+		]]>
+		</mx:Script>
+                <mx:Panel layout="horizontal" height="100%" width="100%">
+                    <mx:VBox width="100%" height="100%">
+                        <ns:DataGridRowColor id="dgInflation" width="100%" height="100%" editable="true"
+                                             dataProvider="{myInflationrate}"
+                                             itemEditEnd="{validatGridInput(event,0,10,dgInflation);}"
+                                             rowColorFunction="rowColor">
+                            <ns:columns>
+                                <ns:DataGridColumnConceptSort headerText="Country aggregate"
+                                                              labelFunction="i_country"
+                                                              sortDescending="true"
+                                                              editable="false"
+                                                              sortCompareFunction="sortInflationRateCountry"/>
+                                <ns:FormattedDataGridColomn percision="2" headerText="Value (%)"
+                                                            dataField="value"
+                                                            editable="true"
+                                                            fontWeight="bold"
+                                                            textAlign="right"/>
+                                <ns:FormattedDataGridColomn percision="2" headerText="Baseline Value (%)"
+                                                            editable="false"
+                                                            labelFunction="getBaselineValue"
+                                                            textAlign="right"/>
+                            </ns:columns>
+                        </ns:DataGridRowColor>
+                        <mx:HBox width="100%" horizontalAlign="right">
+                            <mx:Button label="Reset to baseline"
+                                       click="{resetToBaseline(outlook.inflationRates)}"
+                                       enabled="{isEditable()}"
+                                       visible="{_showCtrl}"
+                                       includeInLayout="{_showCtrl}"/>
+                        </mx:HBox>
+                    </mx:VBox>
+                </mx:Panel>
+            </mx:Canvas>
+
+            <!--Energy prices -->
+            <mx:Canvas id="tabEnergyPrices"
+                       width="100%" height="100%" label="Energy prices"
+                       toolTip="Energy is one important input cost factor for agricultural production activities. Here you can change the world Brent crude oil price.">
+                <mx:Script>
+		<![CDATA[
+					
+			private function ep_country(item:Object, column:DataGridColumn):String {
+                        return (EnergyPrice)(item).countryAggregate.name;
+                    }
+
+                    private function sortEnergyPriceRateCountry(obj1:EnergyPrice, obj2:EnergyPrice):int {
+                        return ObjectUtil.stringCompare(obj1.countryAggregate.name, obj2.countryAggregate.name);
+                    }
+		]]>
+		</mx:Script>
+                <mx:Panel layout="horizontal" height="100%" width="100%">
+                    <mx:VBox width="100%" height="100%">
+                        <ns:DataGridRowColor id="dgEnergyPrice" width="100%" height="100%"
+                                             editable="true"
+                                             dataProvider="{myEnergyPrice}"
+                                             itemEditEnd="{validatGridInput(event,20,150,dgEnergyPrice);}"
+                                             rowColorFunction="rowColor">
+                            <ns:columns>
+                                <ns:DataGridColumnConceptSort headerText="Country aggregate"
+                                                              labelFunction="ep_country"
+                                                              editable="false"
+                                                              sortDescending="true"
+                                                              sortCompareFunction="sortEnergyPriceRateCountry"/>
+                                <ns:FormattedDataGridColomn percision="2" headerText="Value (EUR/L)"
+                                                            dataField="value"
+                                                            editable="true"
+                                                            fontWeight="bold"
+                                                            textAlign="right"/>
+                                <ns:FormattedDataGridColomn percision="2" headerText="Baseline Value (EUR/L)"
+                                                            editable="false"
+                                                            labelFunction="getBaselineValue"
+                                                            textAlign="right"/>
+                            </ns:columns>
+                        </ns:DataGridRowColor>
+                        <mx:HBox width="100%" horizontalAlign="right">
+                            <mx:Button label="Reset to baseline"
+                                       click="{resetToBaseline(outlook.energyPrice)}"
+                                       enabled="{isEditable()}"
+                                       visible="{_showCtrl}"
+                                       includeInLayout="{_showCtrl}"/>
+                        </mx:HBox>
+                    </mx:VBox>
+
+                </mx:Panel>
+            </mx:Canvas>
+
+            <!--Yield growth -->
+            <mx:Canvas id="tabYieldGrowth"
+                       width="100%" height="100%" label="Yield growth"
+                       toolTip="Yields are exogenous input factors to the economic models. They assume a standard yield growth between base- and simulation year. Here you can add (or subtract) a certain percentage to this value.">
+                <mx:Script>
+		<![CDATA[
+	
+			private function yg_country(item:Object, column:DataGridColumn):String {
+                        return (YieldGrowth)(item).country.name;
+                    }
+
+                    private function sortYieldGrowthCountry(obj1:YieldGrowth, obj2:YieldGrowth):int {
+                        return ObjectUtil.stringCompare(obj1.country.name + obj1.activityGroup.label_en, obj2.country.name + obj2.activityGroup.label_en);
+                    }
+
+                    private function yg_product(item:Object, column:DataGridColumn):String {
+                        return (YieldGrowth)(item).activityGroup.label_en;
+                    }
+
+                    private function sortYieldGrowthActivityGroup(obj1:YieldGrowth, obj2:YieldGrowth):int {
+                        return ObjectUtil.stringCompare(obj1.activityGroup.label_en + obj1.country.name, obj2.activityGroup.label_en + obj2.country.name);
+                    }
+			 ]]>
+	 </mx:Script>
+
+                <mx:Panel layout="horizontal" height="100%" width="100%">
+                    <mx:VBox width="100%" height="100%">
+                        <ns:DataGridRowColor id="dgYieldGrowth" width="100%" height="100%"
+                                             editable="true"
+                                             dataProvider="{myYieldGrowth}"
+                                             itemEditEnd="{validatGridInput(event,-50,50,dgYieldGrowth);}"
+                                             rowColorFunction="rowColor">
+                            <ns:columns>
+                                <ns:DataGridColumnConceptSort headerText="EU country"
+                                                              labelFunction="yg_country"
+                                                              editable="false"
+                                                              sortDescending="true"
+                                                              sortCompareFunction="sortYieldGrowthCountry"/>
+                                <ns:DataGridColumnConceptSort headerText="Product"
+                                                              labelFunction="yg_product"
+                                                              sortDescending="true"
+                                                              editable="false"
+                                                              sortCompareFunction="sortYieldGrowthActivityGroup"/>
+                                <ns:FormattedDataGridColomn percision="2" headerText="Value (%)"
+                                                            dataField="value"
+                                                            editable="true"
+                                                            fontWeight="bold"
+                                                            textAlign="right"/>
+                                <ns:FormattedDataGridColomn percision="2" headerText="Baseline Value (%)"
+                                                            editable="false"
+                                                            labelFunction="getBaselineValue"
+                                                            textAlign="right"/>
+                            </ns:columns>
+                        </ns:DataGridRowColor>
+                        <mx:HBox width="100%" horizontalAlign="right">
+                            <mx:Button label="Reset to baseline"
+                                       click="{resetToBaseline(outlook.yieldGrowth)}"
+                                       enabled="{isEditable()}"
+                                       visible="{_showCtrl}"
+                                       includeInLayout="{_showCtrl}"/>
+                        </mx:HBox>
+                    </mx:VBox>
+                </mx:Panel>
+            </mx:Canvas>
+
+            <!-- Modulation  -->
+            <mx:Canvas id="tabModulation"
+                       width="100%" height="100%"
+                       label="Modulation"
+                       toolTip="With the CAP reform a certain percentage of first pillar expenditures is transferred into the second pillar. This percentage can be changed here.">
+                <mx:Script>
+		<![CDATA[
+	
+			private function m_countryaggregate(item:Object, column:DataGridColumn):String {
+                        return (Modulation)(item).fromCountryAggregate.name;
+                    }
+
+                    private function sortModulationCountryAggregate(obj1:Modulation, obj2:Modulation):int {
+                        return ObjectUtil.stringCompare(obj1.fromCountryAggregate.name, obj2.fromCountryAggregate.name);
+                    }
+			 ]]>
+	 </mx:Script>
+
+                <mx:Panel height="100%" width="100%">
+                    <ns:DataGridRowColor width="100%" height="100%"
+                                         id="dgModulation"
+                                         dataProvider="{myModulation}"
+                                         itemEditEnd="{validatGridInput(event,0,10,dgModulation);}"
+                                         editable="true"
+                                         rowColorFunction="rowColor">
+                        <ns:columns>
+                            <ns:DataGridColumnConceptSort headerText="Country aggregate"
+                                                          editable="false"
+                                                          sortDescending="true"
+                                                          labelFunction="m_countryaggregate"
+                                                          sortCompareFunction="sortModulationCountryAggregate"/>
+                            <ns:FormattedDataGridColomn percision="2" headerText="Value (%)"
+                                                        dataField="value"
+                                                        editable="true"
+                                                        fontWeight="bold"
+                                                        textAlign="right"/>
+                            <ns:FormattedDataGridColomn percision="2" headerText="Baseline Value (%)"
+                                                        editable="false"
+                                                        labelFunction="getBaselineValue"
+                                                        textAlign="right"/>
+                        </ns:columns>
+                    </ns:DataGridRowColor>
+                    <mx:HBox width="100%" horizontalAlign="right">
+                        <mx:Button label="Reset to baseline"
+                                   click="{resetToBaseline(outlook.modulations)}"
+                                   enabled="{isEditable()}"
+                                   visible="{_showCtrl}"
+                                   includeInLayout="{_showCtrl}"/>
+                    </mx:HBox>
+                </mx:Panel>
+            </mx:Canvas>
+        </mx:ViewStack>
+    </mx:Panel>
+</mx:Canvas>
+

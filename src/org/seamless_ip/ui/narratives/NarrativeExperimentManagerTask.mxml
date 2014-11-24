@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: NarrativeExperimentManagerTask.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+           width="100%" height="100%"
+           xmlns:common="org.seamless_ip.ui.common.*"
+           xmlns:narratives="org.seamless_ip.ui.narratives.*"
+           show="show()"
+        >
+
+    <!--
+	Lets the user define experiments increateTextInputFormItem a narrative
+	fashion. All inputs are textual and later (in the modelling phase) to be
+	translated into 'hard' values for the models to work with.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.controls.Alert;
+        import mx.core.Application;
+        import mx.core.IFlexDisplayObject;
+        import mx.events.CloseEvent;
+        import mx.events.IndexChangedEvent;
+        import mx.managers.PopUpManager;
+
+        import org.seamless_ip.services.remoting.RequestProgressEvent;
+        import org.seamless_ip.services.transferobjects.seamproj.ExperimentNarrative;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        [Bindable]
+        private var _project:Project;
+        [Bindable]
+        private var _editable:Boolean = true;
+        [Bindable]
+        private var _narrativeServices:NarrativeServices;
+
+        private var _modified:Boolean;
+
+
+        public function get NarrativeServicesSingleton():NarrativeServices {
+            if (_narrativeServices == null) {
+                _narrativeServices = new NarrativeServices();
+                _narrativeServices.addEventListener(RequestProgressEvent.REQUEST_SEND, reqsend);
+                _narrativeServices.addEventListener(RequestProgressEvent.REQUEST_COMPLETED, reqcompleted);
+            }
+            return _narrativeServices;
+        }
+
+
+        [Bindable]
+        private function get modified():Boolean {
+            return _modified;
+        }
+
+
+        private function set modified(value:Boolean):void {
+            if (_editable) {
+                if (value != _modified) {
+                    _modified = value;
+                    if (_modified) {
+                        labelStatus.text = "Do not forget to save!";
+                        labelStatus.setStyle("color", 0xFF0000);
+                    }
+                    else {
+                        labelStatus.text = "";
+                    }
+                }
+            }
+            updateButtonState();
+        }
+
+
+        private function show():void {
+            NarrativeServicesSingleton.findAll(((Number)(_project.problem.id)));
+            updateEditable();
+        }
+
+
+        private function reqcompleted(event:RequestProgressEvent):void {
+            if (mainViewStack != null) {
+                mainViewStack.selectedIndex = 1;
+
+                //if we have created a new Experiment
+                if (event.token != null) {
+                    var args: NarrativeServiceArgs = (NarrativeServiceArgs)(event.token);
+                    if (args.Calldescr == NarrativeServices.CREATEOKMSG) {
+                        var exp:ExperimentNarrative = args.Experimentnarrative;
+                        //we set combo and experiemnts screen to display the new one!
+                        comboBoxExperiments.selectedIndex = NarrativeServicesSingleton.experiments.getItemIndex(exp);
+                        viewStackExperiments.selectedIndex = NarrativeServicesSingleton.experiments.getItemIndex(exp);
+                    }
+                    else if (args.Calldescr == NarrativeServices.DELETEOKMSG) {
+                        if (args.Resultnumber < 0)
+                            Alert.show(args.Callfeedbackdescr);
+                    }
+                }
+            }
+            modified = false;
+        }
+
+
+        private function reqsend(event:RequestProgressEvent):void {
+            if (mainViewStack != null) {
+                mainViewStack.selectedIndex = 0;
+                /*progress screen*/
+                progressscreed.progressMessage = event.message;
+            }
+        }
+
+
+        private function updateEditable():void {
+            _modified = false;
+            if ((getUser() != null) && (_project != null)) {
+                _editable = getUser().canDoForProject(_project.id, "UPDATE", "NARRATIVE_EXPERIMENT");
+            }
+            else {
+                _editable = false;
+            }
+            updateButtonState();
+        }
+
+
+        private function getUser():User {
+            return Application.application.activeUser;
+        }
+
+
+        public function set project(project:Project):void {
+            _project = project;
+        }
+
+
+        private function changed(event:Event):void {
+            modified = true;
+        }
+
+
+        /**
+         * Handles the add experiment by composition button. A new experiment will be
+         * added to the collection and an input tab page created for it.
+         */
+        private function experimentCompositionHandler(event:Event):void
+        {
+
+            var myPopUp:IFlexDisplayObject = PopUpManager.createPopUp(this, ExperimentCompositionDlg, true);
+
+            ExperimentCompositionDlg(myPopUp).Narrativeservices = NarrativeServicesSingleton;
+            ExperimentCompositionDlg(myPopUp).Project = _project;
+            PopUpManager.centerPopUp(myPopUp);
+            myPopUp.addEventListener(Event.COMPLETE, function(event:Event):void {
+                NarrativeServicesSingleton.createByCompositionExperiment(ExperimentCompositionDlg(myPopUp).title_, ExperimentCompositionDlg(myPopUp).description, (Number)(_project.problem.id), (Number)(ExperimentCompositionDlg(myPopUp).SelectedContext.id), (Number)(ExperimentCompositionDlg(myPopUp).SelectedOutlook.id), (Number)(ExperimentCompositionDlg(myPopUp).SelectedPolicyOption.id));
+            }
+                    );
+        }
+
+        /**
+         * Handles the add experiment button. A new experiment will be
+         * added to the collection and an input tab page created for it.
+         */
+        private function addExperimentHandler(event:Event):void {
+            NarrativeServicesSingleton.createExperiment((Number)(_project.problem.id));
+        }
+
+
+        /**
+         * Display alert that confirms removal of the selected experiment.
+         */
+        private function removeExperiment(item:Object):void {
+            Alert.show(
+                    "Are you sure you want to remove the experiment: '" + item.title + "'?",
+                    "Remove Experiment",
+                    3,
+                    null,
+                    removeExperimentAlertHandler
+                    );
+        }
+
+
+        private function removeExperimentAlertHandler(event:CloseEvent):void {
+            if (event.detail == Alert.YES) {
+                var item:Object = comboBoxExperiments.selectedItem;
+                var experimentId:Number = item.id;
+                NarrativeServicesSingleton.deleteExperiment(experimentId);
+                modified = false;
+            }
+        }
+
+
+        private function requestProgressEventHandler(event:RequestProgressEvent):void {
+            if (event.type == RequestProgressEvent.REQUEST_COMPLETED) {
+                if (event.token.marker == "save") {
+                    labelStatus.setStyle("color", 0x808080);
+                    labelStatus.text = event.message;
+                }
+            }
+        }
+
+        private function saveValues(index:int):void {
+            ((NarrativeExperimentDetail)(expDetail[index])).saveValues();
+            NarrativeServicesSingleton.update((ExperimentNarrative)(NarrativeServicesSingleton.experiments.getItemAt(index)));
+            modified = false;
+        }
+
+        private function restoreValues(index:int):void {
+            NarrativeServicesSingleton.restoreValues((ExperimentNarrative)(NarrativeServicesSingleton.experiments.getItemAt(index)));
+            modified = false;
+            viewStackExperiments.selectedIndex = index;
+        }
+
+
+        private function tabChanged(ievent:IndexChangedEvent):void {
+            if ((modified) && (_editable)) {
+                Alert.show("Save changes in experiment " + ((ExperimentNarrative)(NarrativeServicesSingleton.experiments[ievent.oldIndex])).title + "?", "Save confirmation:",
+                        Alert.YES | Alert.NO, this, function(event:CloseEvent):void {
+                    if (event.detail == Alert.YES) {
+                        if (expDetail != null) {
+                            saveValues(ievent.oldIndex);
+                        }
+                    }
+                    else if (event.detail == Alert.NO) {
+                        if (expDetail != null) {
+                            restoreValues(ievent.oldIndex);
+                        }
+                    }
+                    viewStackExperiments.selectedIndex = ievent.newIndex;
+                    modified = false;
+                }
+                        )
+            }
+        }
+
+
+        private function experimentSelectionHandler():void {
+            if (comboBoxExperiments.selectedIndex != -1) {
+                viewStackExperiments.selectedIndex = comboBoxExperiments.selectedIndex;
+            }
+            updateButtonState();
+        }
+
+
+        private function updateButtonState():void {
+            var allowed:Boolean;
+
+            allowed = allowProjectAction("CREATE", _project);
+            addExperimentButton.enabled = (allowed);
+
+            allowed = allowProjectAction("UPDATE", _project);
+            saveButton.enabled = (allowed && modified && (comboBoxExperiments.selectedItem != null));
+            discardButton.enabled = saveButton.enabled;
+
+            allowed = allowProjectAction("DELETE", _project);
+            removeExperimentButton.enabled = (allowed && (comboBoxExperiments.selectedItem != null));
+        }
+
+
+        /**
+         * Checks if the (current) user is allowed to perform a certain
+         * action for the current project.
+         */
+        private function allowProjectAction(task:String, item:Object):Boolean {
+            if ((item != null) && item.hasOwnProperty("id")) {
+                if ((getUser() != null) && (getUser().canDoForProject(item.id, task, "NARRATIVE_EXPERIMENT")))
+                    return true;
+            }
+            return false;
+        }
+			
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:ViewStack id="mainViewStack" width="100%" height="100%"
+                  creationPolicy="all">
+
+        <common:ServerProgressView id="progressscreed">
+        </common:ServerProgressView>
+
+        <mx:VBox width="100%" height="100%" paddingTop="0" paddingBottom="2">
+            <mx:HBox width="100%" horizontalAlign="left" verticalAlign="middle">
+                <mx:Label text="Select narrative for experiment:"/>
+                <mx:ComboBox id="comboBoxExperiments"
+                     dataProvider="{_narrativeServices.experiments}"
+                     labelField="title"
+                     width="500"
+                     itemRenderer="mx.controls.Label"
+                     change="{experimentSelectionHandler()}"
+                />
+            </mx:HBox>
+
+            <mx:ViewStack id="viewStackExperiments"
+                          width="100%"
+                          height="100%"
+                          change="tabChanged(event)"
+                          alpha="0.5"
+                    >
+                <mx:Repeater id="rep" dataProvider="{_narrativeServices.experiments}">
+                    <narratives:NarrativeExperimentDetail id="expDetail"
+                                                          editable="{_editable}"
+                                                          label="{ExperimentNarrative(rep.currentItem).title}"
+                                                          experiment="{rep.currentItem}"
+                                                          change="changed(event)"
+                            />
+                </mx:Repeater>
+            </mx:ViewStack>
+
+            <mx:HBox width="100%" horizontalAlign="right" verticalAlign="middle">
+                <mx:LinkButton id="addExperimentButton"
+                               label="Add Experiment..."
+                               visible="{_editable}"
+                               includeInLayout="{_editable}"
+                               enabled="false"
+                               click="experimentCompositionHandler(event)"
+                               icon="@Embed('/img/icons/seamless-add.gif')"
+                               disabledIcon="@Embed('/img/icons/seamless-add-greyed.gif')"
+                               toolTip="Offers the possibility to select one context, one outlook and one policy to create a new experiment."/>
+                <mx:LinkButton id="removeExperimentButton"
+                               label="Remove..."
+                               visible="{_editable}"
+                               includeInLayout="{_editable}"
+                               enabled="false"
+                               click="{removeExperiment(comboBoxExperiments.selectedItem)}"
+                               toolTip="Remove the selected narrative experiment"
+                               icon="@Embed('/img/icons/seamless-delete.gif')"
+                               disabledIcon="@Embed('/img/icons/seamless-delete-greyed.gif')"
+                        />
+                <mx:Spacer width="100%"/>
+                <mx:Label id="labelStatus"
+                          text=""
+                          truncateToFit="true"
+                          width="250"
+                          maxWidth="250"
+                          textAlign="right"
+                          color="#808080"/>
+                <mx:LinkButton id="saveButton"
+                               label="Save"
+                               enabled="false"
+                               visible="{_editable}"
+                               toolTip="Save all changes"
+                               click="saveValues(comboBoxExperiments.selectedIndex)"
+                               icon="@Embed('/img/icons/seamless-save.gif')"
+                               disabledIcon="@Embed('/img/icons/seamless-save-greyed.gif')"
+                        />
+                <mx:LinkButton id="discardButton"
+                               label="Discard"
+                               enabled="false"
+                               visible="{_editable}"
+                               toolTip="Discard all changes"
+                               click="restoreValues(viewStackExperiments.selectedIndex)"
+                               icon="@Embed('/img/icons/seamless-undo.gif')"
+                               disabledIcon="@Embed('/img/icons/seamless-undo-greyed.gif')"
+                        />
+            </mx:HBox>
+        </mx:VBox>
+
+    </mx:ViewStack>
+</mx:Canvas>

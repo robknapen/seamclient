@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: ExperimentItemRenderer.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Label xmlns:mx="http://www.adobe.com/2006/mxml"
+          color="{getColor(data)}"
+          text="{getLabel(data)}"
+          mouseDown="labelMouseHandler(event)"
+        >
+
+    <!--
+        This item renderer is for Experiment instances and depicts the state field
+        as a text label (state is stored as an integer value) and text colour.
+
+        @author Rob Knapen
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.controls.dataGridClasses.DataGridListData;
+
+        import org.seamless_ip.services.transferobjects.seamproj.Experiment;
+
+        /**
+         * Returns a label for the Experiment field displayed. Mostly this
+         * is the label, but for the state field the integer value is
+         * translated into a text.
+         */
+        private function getLabel(data:Object):String {
+            if (!(data is Experiment))
+                return listData.label;
+
+            if ((listData is DataGridListData) && (DataGridListData(listData).dataField == "state"))
+                return getStateLabel(Experiment(data));
+            else
+                return listData.label;
+        }
+
+        /**
+         * Translates the integer state field into a text for display
+         * purposes.
+         */
+        private function getStateLabel(experiment:Experiment):String {
+            switch (experiment.state) {
+                case 0:
+                    return "Not Calculated";
+                case 1:
+                    return "Aborted";
+                case 2:
+                    return "In Progress";
+                case 3:
+                    return "Completed";
+                case 4:
+                    return "Failed";
+            }
+            return "";
+        }
+
+        /**
+         * Returns a colour based on the state of the Experiment. When it
+         * is not calculated (state == 3 (Completed)) a grey colour will
+         * be returned, otherwise black.
+         */
+        private function getColor(data:Object):uint {
+            if (data is Experiment) {
+                if (Experiment(data).state == 3)
+                    return 0x000000; // full black
+            }
+            return 0xAAAAAA; // greyed out
+        }
+
+        /**
+         * Handles mouse down events and stops them when the Experiment
+         * calculation is not completed (state != 3). Effectively making
+         * the row in the table unselectable.
+         */
+        private function labelMouseHandler(event:MouseEvent):void {
+            if ((data is Experiment) && (Experiment(data).state != 3))
+                event.stopImmediatePropagation();
+        }
+		]]>
+	</mx:Script>
+</mx:Label>

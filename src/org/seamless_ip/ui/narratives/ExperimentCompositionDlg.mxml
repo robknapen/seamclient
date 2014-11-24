@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: ExperimentCompositionDlg.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<common:SizeableTitleWindow
+        xmlns:mx="http://www.adobe.com/2006/mxml"
+        xmlns="components.*"
+        xmlns:common="org.seamless_ip.ui.common.*"
+        title="Experiment Composition"
+        layout="absolute"
+        width="100%" height="100%"
+        showCloseButton="true"
+        borderAlpha="0.8"
+        borderColor="#e2d4b3"
+        cornerRadius="10"
+        backgroundColor="#e2d4b3"
+        creationComplete="init()"
+        xmlns:ns="org.seamless_ip.ui.narratives.*">
+
+    <!--
+	Dialog box to compose experiments by combining already defined outlook,
+	context and policy options.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.controls.RadioButton;
+        import mx.events.CloseEvent;
+        import mx.managers.PopUpManager;
+        import mx.utils.StringUtil;
+
+        import org.seamless_ip.services.transferobjects.seamproj.ContextNarrative;
+        import org.seamless_ip.services.transferobjects.seamproj.OutlookNarrative;
+        import org.seamless_ip.services.transferobjects.seamproj.PolicyOptionNarrative;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+
+        private static var OUTLOOKSTRINGPATTER: String = "{0} (outlook_id = {1})";
+        private static var CONTEXTSTRINGPATTER: String = "{0} (context_id = {1})";
+        private static var POLICYSTRINGPATTER: String = "{0} (policyoption_id = {1})";
+
+        [Bindable]
+        public static var NOTASSIGNED: String = "no item selected";
+
+
+        private var _project: Project;
+
+        public function set Project(value: Project):void
+        {
+            _project = value;
+        }
+
+        [Bindable]
+        private var _modified:Boolean;
+
+
+        public function get title_():String
+        {
+            return titleinput.text;
+        }
+
+        public function get description():String
+        {
+            return descriptioninput.text;
+        }
+
+        private var _selectedcontext: ContextNarrative;
+
+        public function set SelectedContext(value: ContextNarrative):void
+        {
+            _selectedcontext = value;
+            if (_selectedcontext == null)
+                selectedcontextText.text = NOTASSIGNED;
+            else
+                selectedcontextText.text = StringUtil.substitute(CONTEXTSTRINGPATTER, _selectedcontext.narrative.title, _selectedcontext.id);
+        }
+
+        public function get SelectedContext():ContextNarrative
+        {
+            return _selectedcontext;
+        }
+
+        private var _selectedoutlook:OutlookNarrative;
+
+        public function set SelectedOutlook(value: OutlookNarrative):void
+        {
+            _selectedoutlook = value;
+            if (_selectedoutlook == null)
+                selectedoutlookText.text = NOTASSIGNED;
+            else
+                selectedoutlookText.text = StringUtil.substitute(OUTLOOKSTRINGPATTER, _selectedoutlook.narrative.title, _selectedoutlook.id);
+        }
+
+        public function get SelectedOutlook():OutlookNarrative
+        {
+            return _selectedoutlook;
+        }
+
+        private var _selectedpolicyoption:PolicyOptionNarrative;
+
+        public function set SelectedPolicyOption(value: PolicyOptionNarrative):void
+        {
+            _selectedpolicyoption = value;
+            if (_selectedpolicyoption == null)
+                selectedpolicyText.text = NOTASSIGNED;
+            else
+                selectedpolicyText.text = StringUtil.substitute(POLICYSTRINGPATTER, _selectedpolicyoption.narrative.title, _selectedpolicyoption.id);
+        }
+
+        public function get SelectedPolicyOption():PolicyOptionNarrative
+        {
+            return _selectedpolicyoption;
+        }
+
+
+        [Bindable]
+        private var _narrativeServices:NarrativeServices;
+
+        public function set Narrativeservices(value: NarrativeServices):void
+        {
+            _narrativeServices = value;
+        }
+
+
+        private function init():void
+        {
+            this.addEventListener(Event.COMPLETE, operationComplete)
+            this.addEventListener(Event.CLOSE, closeMe)
+
+            filtercbClick(null);
+        }
+
+        private function closeMe(event:CloseEvent):void {
+            PopUpManager.removePopUp(this);
+        }
+
+        private function operationComplete(event:Event):void {
+            PopUpManager.removePopUp(this);
+        }
+
+
+        public function saveBtnPress(event:Event):void
+        {
+            this.dispatchEvent(new Event(Event.COMPLETE));
+        }
+
+        public function checkIfOk(event:Event):void
+        {
+            if ((SelectedContext != null) &&
+                (SelectedOutlook != null) &&
+                (SelectedPolicyOption != null))
+                savebtn.enabled = true;
+            else
+                savebtn.enabled = false;
+        }
+
+
+        private function outlookCb_labelFunc(item:Object, column:AdvancedDataGridColumn):String {
+
+            var o: OutlookNarrative = (OutlookNarrative)(item);
+            return StringUtil.substitute(OUTLOOKSTRINGPATTER, o.narrative.title, o.id);
+        }
+
+        private function contextCb_labelFunc(item:Object, column:AdvancedDataGridColumn):String {
+            var o: ContextNarrative = (ContextNarrative)(item);
+            return StringUtil.substitute(CONTEXTSTRINGPATTER, o.narrative.title, o.id);
+        }
+
+        private function policyoptionCb_labelFunc(item:Object, column:AdvancedDataGridColumn):String {
+            var o: PolicyOptionNarrative = (PolicyOptionNarrative)(item);
+            return StringUtil.substitute(POLICYSTRINGPATTER, o.narrative.title, o.id);
+        }
+
+
+        private function filtercbClick(event: MouseEvent):void {
+            if (filtercb.selected)
+            {
+                //context
+                _narrativeServices.contextforcomposition.filterFunction = null;
+                _narrativeServices.contextforcomposition.refresh();
+                if (grid_context != null)
+                    gc_context.refresh();
+                //outlook
+                _narrativeServices.outlookforcomposition.filterFunction = null;
+                _narrativeServices.outlookforcomposition.refresh();
+                if (grid_outlook != null)
+                    gc_outlook.refresh();
+                //policy
+                _narrativeServices.policyoptionforcomposition.filterFunction = null;
+                _narrativeServices.policyoptionforcomposition.refresh();
+                if (grid_policy != null)
+                    gc_policy.refresh();
+            }
+            else
+            {
+                //context
+                _narrativeServices.contextforcomposition.filterFunction = onlyBaselineAndCurrentProject;
+                _narrativeServices.contextforcomposition.refresh();
+                if (grid_context != null)
+                    gc_context.refresh();
+                //outlook
+                _narrativeServices.outlookforcomposition.filterFunction = onlyBaselineAndCurrentProject;
+                _narrativeServices.outlookforcomposition.refresh();
+                if (grid_outlook != null)
+                    gc_outlook.refresh();
+                //policy
+                _narrativeServices.policyoptionforcomposition.filterFunction = onlyBaselineAndCurrentProject;
+                _narrativeServices.policyoptionforcomposition.refresh();
+                if (grid_policy != null)
+                    gc_policy.refresh();
+            }
+        }
+
+
+        private function onlyBaselineAndCurrentProject(item:Object):Boolean
+        {
+            if (item is ContextNarrative)
+            {
+                if ((((ContextNarrative)(item)).theexperimentowner_isbaseline == true) ||
+                    (((ContextNarrative)(item)).theprojectowner_id == _project.id))
+                    return true;
+            }
+            else if (item is OutlookNarrative)
+            {
+                if ((((OutlookNarrative)(item)).theexperimentowner_isbaseline == true) ||
+                    (((OutlookNarrative)(item)).theprojectowner_id == _project.id))
+                    return true;
+            }
+            else if (item is PolicyOptionNarrative)
+                {
+                    if ((((PolicyOptionNarrative)(item)).theexperimentowner_isbaseline == true) ||
+                        (((PolicyOptionNarrative)(item)).theprojectowner_id == _project.id))
+                        return true;
+                }
+
+            return false;
+        }
+
+        private function click(event: MouseEvent):void {
+            if (event.target is RadioButton)
+            {
+                var pressedcbexcl: RadioButton = ((RadioButton)(event.target));
+
+                if (pressedcbexcl.selected)
+                {
+                    //set the item of the checked cd as current
+                    if (pressedcbexcl.data is ContextNarrative)
+                        SelectedContext = ((ContextNarrative)(pressedcbexcl.data));
+                    else if (pressedcbexcl.data is OutlookNarrative)
+                        SelectedOutlook = ((OutlookNarrative)(pressedcbexcl.data));
+                    else if (pressedcbexcl.data is PolicyOptionNarrative)
+                            SelectedPolicyOption = ((PolicyOptionNarrative)(pressedcbexcl.data));
+                }
+            }
+
+            checkIfOk(event);
+        }
+	
+		]]>
+	</mx:Script>
+
+
+    <mx:VBox height="100%" width="100%" paddingBottom="5" paddingTop="5" paddingLeft="5" paddingRight="5">
+        <mx:TabNavigator height="100%" width="100%" minWidth="500" minHeight="300">
+            <mx:Canvas label="Context selection" width="100%" height="100%">
+                <mx:AdvancedDataGrid id="grid_context"
+                                     width="100%" height="100%"
+                                     click="click(event)"
+                                     initialize="gc_context.refresh()">
+                    <mx:dataProvider>
+                        <mx:GroupingCollection id="gc_context" source="{_narrativeServices.contextforcomposition}">
+                            <mx:grouping>
+                                <mx:Grouping>
+                                    <mx:GroupingField name="theprojectowner_title"/>
+                                </mx:Grouping>
+                            </mx:grouping>
+                        </mx:GroupingCollection>
+                    </mx:dataProvider>
+                    <mx:columns>
+                        <mx:AdvancedDataGridColumn labelFunction="contextCb_labelFunc" headerText="Context title"/>
+                        <mx:AdvancedDataGridColumn id="cbcol_context" resizable="false" headerText=""
+                                                   dataField="selected" width="20"/>
+                    </mx:columns>
+                    <mx:rendererProviders>
+                        <mx:AdvancedDataGridRendererProvider column="{cbcol_context}"
+                                                             depth="2"
+                                                             columnSpan="1"
+                                                             renderer="org.seamless_ip.ui.narratives.RadiobuttonRenderer"/>
+                    </mx:rendererProviders>
+                </mx:AdvancedDataGrid>
+            </mx:Canvas>
+            <mx:Canvas label="Outlook selection" width="100%" height="100%">
+                <mx:AdvancedDataGrid id="grid_outlook"
+                                     width="100%" height="100%"
+                                     click="click(event)"
+                                     initialize="gc_outlook.refresh()">
+                    <mx:dataProvider>
+                        <mx:GroupingCollection id="gc_outlook" source="{_narrativeServices.outlookforcomposition}">
+                            <mx:grouping>
+                                <mx:Grouping>
+                                    <mx:GroupingField name="theprojectowner_title"/>
+                                </mx:Grouping>
+                            </mx:grouping>
+                        </mx:GroupingCollection>
+                    </mx:dataProvider>
+                    <mx:columns>
+                        <mx:AdvancedDataGridColumn labelFunction="outlookCb_labelFunc" headerText="Outlook title"/>
+                        <mx:AdvancedDataGridColumn id="cbcol_outlook" resizable="false" headerText=""
+                                                   dataField="selected" width="20"/>
+                    </mx:columns>
+                    <mx:rendererProviders>
+                        <mx:AdvancedDataGridRendererProvider column="{cbcol_outlook}"
+                                                             depth="2"
+                                                             columnSpan="1"
+                                                             renderer="org.seamless_ip.ui.narratives.RadiobuttonRenderer"/>
+                    </mx:rendererProviders>
+                </mx:AdvancedDataGrid>
+            </mx:Canvas>
+            <mx:Canvas label="Policy selection" width="100%" height="100%">
+                <mx:AdvancedDataGrid id="grid_policy"
+                                     width="100%" height="100%"
+                                     click="click(event)"
+                                     initialize="gc_policy.refresh()">
+                    <mx:dataProvider>
+                        <mx:GroupingCollection id="gc_policy" source="{_narrativeServices.policyoptionforcomposition}">
+                            <mx:grouping>
+                                <mx:Grouping>
+                                    <mx:GroupingField name="theprojectowner_title"/>
+                                </mx:Grouping>
+                            </mx:grouping>
+                        </mx:GroupingCollection>
+                    </mx:dataProvider>
+                    <mx:columns>
+                        <mx:AdvancedDataGridColumn labelFunction="policyoptionCb_labelFunc" headerText="Policy title"/>
+                        <mx:AdvancedDataGridColumn id="cbcol_policy" resizable="false" headerText=""
+                                                   dataField="selected" width="20"/>
+                    </mx:columns>
+                    <mx:rendererProviders>
+                        <mx:AdvancedDataGridRendererProvider column="{cbcol_policy}"
+                                                             depth="2"
+                                                             columnSpan="1"
+                                                             renderer="org.seamless_ip.ui.narratives.RadiobuttonRenderer"/>
+                    </mx:rendererProviders>
+                </mx:AdvancedDataGrid>
+            </mx:Canvas>
+        </mx:TabNavigator>
+
+        <mx:HBox width="100%"
+                 horizontalAlign="right">
+            <mx:CheckBox id="filtercb"
+                         click="filtercbClick(event)"
+                         label="Show components from all projects"
+                         labelPlacement="left"
+                    />
+        </mx:HBox>
+
+        <mx:Form width="100%">
+            <mx:FormItem width="100%" label="Title:">
+                <mx:TextInput id="titleinput" width="100%"
+                              change="checkIfOk(event)"/>
+            </mx:FormItem>
+            <mx:FormItem width="100%" label="Description:">
+                <mx:TextArea id="descriptioninput" width="100%"
+                             change="checkIfOk(event)"/>
+            </mx:FormItem>
+            <mx:FormItem label="Selected context:" width="100%">
+                <mx:Text id="selectedcontextText"
+                         text="{NOTASSIGNED}"
+                         width="100%"
+                         height="20"
+                         fontWeight="bold"/>
+            </mx:FormItem>
+            <mx:FormItem label="Selected outlook:" width="100%">
+                <mx:Text id="selectedoutlookText"
+                         text="{NOTASSIGNED}"
+                         width="100%"
+                         height="20"
+                         fontWeight="bold"/>
+            </mx:FormItem>
+            <mx:FormItem label="Selected policy:" width="100%">
+                <mx:Text id="selectedpolicyText"
+                         text="{NOTASSIGNED}"
+                         width="100%"
+                         height="20"
+                         fontWeight="bold"/>
+            </mx:FormItem>
+        </mx:Form>
+        <mx:HBox width="100%" horizontalAlign="right" verticalAlign="middle">
+            <mx:Button id="savebtn"
+                       label="Save"
+                       enabled="{_modified}"
+                       toolTip="Save all changes"
+                       click="saveBtnPress(event)"
+                       disabledIcon="@Embed('../../../../img/icons/save_edit_d.gif')"
+                       icon="@Embed('../../../../img/icons/save_edit.gif')"/>
+            <mx:Button id="discardbtn"
+                       label="Discard"
+                       toolTip="Discard all changes"
+                       click="{this.dispatchEvent(new CloseEvent(CloseEvent.CLOSE));}"
+                       disabledIcon="@Embed('../../../../img/icons/delete_edit_d.gif')"
+                       icon="@Embed('../../../../img/icons/delete_edit.gif')"/>
+        </mx:HBox>
+
+    </mx:VBox>
+
+</common:SizeableTitleWindow>

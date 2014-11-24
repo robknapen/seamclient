@@ -1,0 +1,486 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: InstutionalcompatibilityEvaluate.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:Panel creationComplete="{init()}"
+          height="100%"
+          layout="vertical"
+          width="100%"
+          xmlns:mx="http://www.adobe.com/2006/mxml"
+          xmlns:ns="org.seamless_ip.ui.common.*">
+
+    <mx:Script>
+        <![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.managers.PopUpManager;
+
+        import org.seamless_ip.services.transferobjects.pica.CrucialInstitutionalAspect;
+        import org.seamless_ip.services.transferobjects.pica.InstitutionalCompatibility;
+        import org.seamless_ip.services.transferobjects.pica.NaturalResourceFocus;
+        import org.seamless_ip.services.transferobjects.pica.PICAIndicatorGeneral;
+        import org.seamless_ip.services.transferobjects.pica.PICASpatialLevel;
+        import org.seamless_ip.services.transferobjects.pica.PICAassessment;
+        import org.seamless_ip.services.transferobjects.pica.PicaIndicator;
+        import org.seamless_ip.services.transferobjects.pica.PolicyType;
+        import org.seamless_ip.services.transferobjects.pica.PropertyRightsChanges;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        // User
+        private var _user:User;
+
+        [Bindable]
+        public function get user():User {
+            return _user;
+        }
+
+        public function set user(user:User):void {
+            _user = user;
+        }
+
+        [Bindable]
+        public var picaInstCompService:PicaInstCompService = null;
+        private var _instName:String = "No name";
+
+        public function set instName(theInstName:String):void {
+            _instName = theInstName;
+        }
+
+        [Bindable]
+        public function get instName():String {
+            return _instName;
+        }
+
+        private var _institutionalCompatibility:InstitutionalCompatibility = null;
+
+        private function init():void {
+            if (spatiallevelfrm == null) {
+                spatiallevelfrm = new SpatialLevelFrm();
+                spatiallevelfrm.picaInstCompService = picaInstCompService;
+            }
+            picaInstCompService.addEventListener(PicaInstCompEvent.UPDATEINSTCOMPCOMPLETE, updateInstHandler);
+            picaInstCompService.addEventListener(PicaInstCompEvent.DELETEPICASPATIALLEVELCOMPLETE, deleteSpatialHandler)
+        }
+
+        public function filterCIAs(obj:Object):Boolean {
+            return (obj as CrucialInstitutionalAspect).selected;
+        }
+
+        public function set institutionalCompatibility(institutionalCompatibility:InstitutionalCompatibility):void {
+            _institutionalCompatibility = institutionalCompatibility;
+            for each (var pT:PICAassessment in institutionalCompatibility.PICACIAThemes) {
+                for each (var cIA:CrucialInstitutionalAspect in cIAS) {
+                    if (cIA.id == pT.crucialInstitutionalAspect.id) {
+                        cIA.selected = true;
+                        break;
+                    }
+                }
+            }
+            // pICASpatialLevel = institutionalCompatibility.PICASpatialLevels;
+        }
+
+        [Bindable]
+        public function get institutionalCompatibility():InstitutionalCompatibility {
+            return _institutionalCompatibility;
+        }
+
+        [Bindable]
+        public var picaService:PicaService;
+        public var _cIAS:ArrayCollection = null;
+
+        [Bindable]
+        public function get cIAS():ArrayCollection {
+            return _cIAS;
+        }
+
+        public function set cIAS(ciaS:ArrayCollection):void {
+            _cIAS = ciaS;
+        }
+
+        private var _pICAIndicatorGeneral:ArrayCollection = null;
+
+        [Bindable]
+        public function get pICAIndicatorGeneral():ArrayCollection {
+            return _pICAIndicatorGeneral;
+        }
+
+        public function set pICAIndicatorGeneral(picaIndicatorGeneral:ArrayCollection):void {
+            _pICAIndicatorGeneral = picaIndicatorGeneral;
+        }
+
+        /* private var _pICASpatialLevel:ArrayCollection = null;
+         [Bindable]
+         public function get pICASpatialLevel():ArrayCollection {return _pICASpatialLevel;}
+         public function set pICASpatialLevel(pICASpatialLevel :ArrayCollection):void {
+         _pICASpatialLevel = pICASpatialLevel;
+         }  */
+        private function ciaChanged(event:Event):void {
+            Alert.show(event.toString());
+        }
+
+        private function discard(event:MouseEvent):void {
+            dispatchEvent(new PicaEvent(PicaEvent.CHANGEVIEWINSTS));
+        }
+
+        private function save(event:MouseEvent):void {
+            picaInstCompService.update(institutionalCompatibility);
+        }
+
+        public function updateInstHandler(event:PicaInstCompEvent):void {
+            var picaE:PicaInstCompEvent = new PicaInstCompEvent(PicaInstCompEvent.FORCEREFRESH);
+            dispatchEvent(picaE);
+        }
+
+        public function deleteSpatialHandler(event:PicaInstCompEvent):void {
+            // Do nothing
+        }
+
+        private function saveIndicators():void {
+        }
+
+        private function saveCIAs():void {
+        }
+
+        public function instCompPicaIndicatorGeneralHandler(event:PicaEvent):void {
+            for each (var picaIndicatorG:PICAIndicatorGeneral in picaService.instCompPICAIndicatorGeneral) {
+                for each (var picaIndicatorG2:PICAIndicatorGeneral in pICAIndicatorGeneral) {
+                    if (picaIndicatorG.id == picaIndicatorG2.id) {
+                        picaIndicatorG2.selected = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        private var spatiallevelfrm:SpatialLevelFrm = null;
+
+        private function addNewSpatialScale():void {
+            var picaSL:PICASpatialLevel = new PICASpatialLevel();
+            picaSL.fromInstitutionalCompability = institutionalCompatibility;
+            spatiallevelfrm.spatialLevel = picaSL;
+            spatiallevelfrm.institutionalCompatibility = institutionalCompatibility;
+            PopUpManager.addPopUp(spatiallevelfrm, this, true);
+            PopUpManager.centerPopUp(spatiallevelfrm);
+        }
+
+        // Why is this not fired??
+        private function tabIndexChanged(event:Event):void {
+        }
+
+        public function onEditIndicator(avEvent:Event, avData:Object):void {
+            if (institutionalCompatibility.PICASpatialLevels == null || institutionalCompatibility.PICASpatialLevels.length == 0) {
+                Alert.show("There is no pica spatial levels...");
+            }
+            var lIndicatorG:PICAIndicatorGeneral = (avData as PICAIndicatorGeneral);
+            var found:Boolean = false;
+            var picaIndicator:PicaIndicator = null;
+            for each (var pI:PicaIndicator in institutionalCompatibility.institutionalCompatibilityIndicatorValues) {
+                if (pI.PICaIndicatorGeneral.id == lIndicatorG.id) {
+                    picaIndicator = pI;
+                    found = true
+                    break;
+                }
+            }
+            if (!found) {
+                picaIndicator = new PicaIndicator();
+                institutionalCompatibility.institutionalCompatibilityIndicatorValues.addItem(picaIndicator);
+            }
+            picaIndicator.PICaIndicatorGeneral = lIndicatorG;
+            picaIndicator.institutionalCompatibility = institutionalCompatibility;
+            picaIndicatorFrm.picaIndicator = picaIndicator;
+            picaIndicatorFrm.picaSpatialLevel = institutionalCompatibility.PICASpatialLevels;
+            PopUpManager.addPopUp(picaIndicatorFrm, this, true);
+            PopUpManager.centerPopUp(picaIndicatorFrm);
+        }
+
+        public function onEditSpatial(avEvent:Event, avData:Object):void {
+            for (var i:int; i < institutionalCompatibility.PICASpatialLevels.length; i++) {
+                if (avData == institutionalCompatibility.PICASpatialLevels.getItemAt(i)) {
+                    spatiallevelfrm.isEditing = true;
+                    spatiallevelfrm.spatialLevel = (PICASpatialLevel)(avData);
+                    spatiallevelfrm.institutionalCompatibility = institutionalCompatibility;
+                    spatiallevelfrm.picaInstCompService = picaInstCompService;
+                    PopUpManager.addPopUp(spatiallevelfrm, this, true);
+                    PopUpManager.centerPopUp(spatiallevelfrm);
+                    break;
+                }
+            }
+        }
+
+        public function onDeleteSpatial(avEvent:Event, avData:Object):void {
+            picaInstCompService.deletePICASpatialLevel((PICASpatialLevel)(avData));
+            institutionalCompatibility.PICASpatialLevels.removeItemAt(institutionalCompatibility.PICASpatialLevels.getItemIndex((PICASpatialLevel)(avData)));
+        }
+
+        private function labelNaturalResource(item:Object, column:DataGridColumn):String {
+            var pI:PICAIndicatorGeneral = (item as PICAIndicatorGeneral);
+            return "";
+            // new PICAassessment().
+        }
+
+        private function labelPropertyRightsChanges(item:Object, column:DataGridColumn):String {
+            var pI:PICAIndicatorGeneral = (item as PICAIndicatorGeneral);
+            return "";
+        }
+
+        private function labelPolicyTypes(item:Object, column:DataGridColumn):String {
+            var pI:PICAIndicatorGeneral = (item as PICAIndicatorGeneral);
+            return "";
+        }
+
+        // Show what's suitible from naturalResourceFoci, naturalResourceFoci and policyTypes point of view
+        private function ciaLabel(item:Object, column:DataGridColumn):String {
+            var cIA:CrucialInstitutionalAspect = (item as CrucialInstitutionalAspect);
+            var ret:String = "";
+            for each (var nat:NaturalResourceFocus in cIA.naturalResourceFoci) {
+                if (_institutionalCompatibility.naturalResourceFocus.id == nat.id) {
+                    ret = "nat";
+                    break;
+                }
+            }
+            for each (var pro:PropertyRightsChanges in cIA.propertyRightsChanges) {
+                if (_institutionalCompatibility.propertyRightsChange.id == pro.id) {
+                    if (ret.length != 0) {
+                        ret += ", ";
+                    }
+                    ret += "pro";
+                    break;
+                }
+            }
+            for each (var pol:PolicyType in cIA.policyTypes) {
+                if (_institutionalCompatibility.policyType.id == pol.id) {
+                    if (ret.length != 0) {
+                        ret += ", ";
+                    }
+                    ret += "pol";
+                    break;
+                }
+            }
+            return ret;
+        }
+
+        public function onTheme(avEvent:Event, avData:Object):void {
+            var lCIA:CrucialInstitutionalAspect = (avData as CrucialInstitutionalAspect);
+            if (!lCIA.selected) {
+                Alert.show("This CIA is not selected!");
+                return;
+            }
+            var found:Boolean = false;
+            var assessment:PICAassessment = null;
+            for each (var pA:PICAassessment in institutionalCompatibility.PICACIAThemes) {
+                if (pA.crucialInstitutionalAspect.id == lCIA.id) {
+                    assessment = pA;
+                    found = true
+                    break;
+                }
+            }
+            if (!found) {
+                assessment = new PICAassessment();
+                institutionalCompatibility.PICACIAThemes.addItem(assessment);
+            }
+            assessment.crucialInstitutionalAspect = lCIA;
+            assessment.ofInstitutionalCompatibility = institutionalCompatibility;
+            picaTheme._pICAassessment = assessment;
+            picaTheme.picaInstCompService = picaInstCompService;
+            PopUpManager.addPopUp(picaTheme, this, true);
+            PopUpManager.centerPopUp(picaTheme);
+        }
+
+        public var picaTheme:PicaTheme = new PicaTheme();
+        public var picaIndicatorFrm:PicaIndicatorFrm = new PicaIndicatorFrm();
+        ]]>
+    </mx:Script>
+    <mx:HBox width="100%">
+        <mx:HBox horizontalAlign="left"
+                 verticalAlign="bottom">
+            <mx:Label text="{instName}"/>
+        </mx:HBox>
+        <mx:HBox horizontalAlign="right"
+                 verticalAlign="bottom"
+                 width="100%">
+            <mx:Button click="{save(event)}"
+                       id="btnBack"
+                       label="Save"
+                       toolTip=""/>
+        </mx:HBox>
+    </mx:HBox>
+    <mx:ViewStack height="100%"
+                  id="viewstackMain"
+                  width="100%">
+        <mx:Panel height="100%"
+                  label="A">
+            <mx:TabBar dataProvider="{viewstackSubA}"
+                       tabIndexChange="{tabIndexChanged(event)}"
+                       width="100%">
+            </mx:TabBar>
+            <mx:ViewStack height="100%"
+                          id="viewstackSubA"
+                          width="100%">
+                <!-- Spatial level -->
+                <mx:Panel height="100%"
+                          label="Spatial level"
+                          layout="vertical"
+                          width="100%">
+                    <ns:DataGridRowColor dataProvider="{institutionalCompatibility.PICASpatialLevels}"
+                                         height="100%"
+                                         id="gridSpatialScale"
+                                         variableRowHeight="true"
+                                         width="100%">
+                        <ns:columns>
+                            <mx:DataGridColumn dataField="selected"
+                                               editable="false"
+                                               headerText=""
+                                               itemRenderer="org.seamless_ip.ui.experimentdesigner.CheckboxRenderer"
+                                               sortable="false"
+                                               visible="false"
+                                               width="20"/>
+                            <mx:DataGridColumn dataField="name"
+                                               headerText="Name"/>
+                            <mx:DataGridColumn dataField="classification"
+                                               headerText="Classification"/>
+                            <mx:DataGridColumn dataField="description"
+                                               headerText="Description"
+                                               wordWrap="true"/>
+                            <mx:DataGridColumn editable="false"
+                                               width="60">
+                                <mx:itemRenderer>
+                                    <mx:Component>
+                                        <mx:HBox>
+                                            <mx:Button click="outerDocument.onEditSpatial( event, data )"
+                                                       label="Edit"/>
+                                        </mx:HBox>
+                                    </mx:Component>
+                                </mx:itemRenderer>
+                            </mx:DataGridColumn>
+                            <mx:DataGridColumn editable="false"
+                                               width="80">
+                                <mx:itemRenderer>
+                                    <mx:Component>
+                                        <mx:HBox>
+                                            <mx:Button click="outerDocument.onDeleteSpatial( event, data )"
+                                                       label="Delete"/>
+                                        </mx:HBox>
+                                    </mx:Component>
+                                </mx:itemRenderer>
+                            </mx:DataGridColumn>
+                        </ns:columns>
+                    </ns:DataGridRowColor>
+                    <mx:HBox horizontalAlign="right"
+                             verticalAlign="bottom"
+                             width="100%">
+                        <mx:Button click="{addNewSpatialScale()}"
+                                   disabledIcon="@Embed('/img/icons/add_obj.gif')"
+                                   enabled="true"
+                                   icon="@Embed('/img/icons/add_obj.gif')"
+                                   label="Add new"
+                                   toolTip=""/>
+                    </mx:HBox>
+                </mx:Panel>
+                <mx:Panel height="100%"
+                          label="CIA's"
+                          layout="vertical"
+                          width="100%">
+                    <ns:DataGridRowColor dataProvider="{cIAS}"
+                                         editable="true"
+                                         height="100%"
+                                         id="gridCIA"
+                                         variableRowHeight="true"
+                                         width="100%">
+                        <ns:columns>
+                            <mx:DataGridColumn dataField="selected"
+                                               editable="false"
+                                               headerText=""
+                                               id="isSelected"
+                                               itemRenderer="org.seamless_ip.ui.experimentdesigner.CheckboxRenderer"
+                                               sortable="false"
+                                               width="20"/>
+                            <mx:DataGridColumn dataField="name"
+                                               editable="false"
+                                               headerText="Name"/>
+                            <mx:DataGridColumn dataField="description"
+                                               editable="false"
+                                               headerText="Description"
+                                               wordWrap="true"/>
+                            <mx:DataGridColumn editable="false"
+                                               headerText="R"
+                                               labelFunction="{ciaLabel}"/>
+                            <mx:DataGridColumn dataField="weblink"
+                                               editable="false"
+                                               headerText="Weblink"/>
+                            <mx:DataGridColumn editable="false"
+                                               width="80">
+                                <mx:itemRenderer>
+                                    <mx:Component>
+                                        <mx:HBox>
+                                            <mx:Button click="outerDocument.onTheme( event, data )"
+                                                       label="Theme"/>
+                                        </mx:HBox>
+                                    </mx:Component>
+                                </mx:itemRenderer>
+                            </mx:DataGridColumn>
+                        </ns:columns>
+                    </ns:DataGridRowColor>
+                </mx:Panel>
+                <mx:Panel height="100%"
+                          label="Indicators"
+                          layout="vertical"
+                          width="100%">
+                    <ns:DataGridRowColor dataProvider="{pICAIndicatorGeneral}"
+                                         height="100%"
+                                         id="gridIndicators"
+                                         variableRowHeight="true"
+                                         width="100%">
+                        <ns:columns>
+                            <mx:DataGridColumn dataField="name"
+                                               headerText="Name"/>
+                            <mx:DataGridColumn dataField="description"
+                                               headerText="Description"
+                                               wordWrap="true"/>
+                            <mx:DataGridColumn dataField="unit"
+                                               headerText="Unit"/>
+                            <mx:DataGridColumn editable="false"
+                                               width="60">
+                                <mx:itemRenderer>
+                                    <mx:Component>
+                                        <mx:HBox>
+                                            <mx:Button click="outerDocument.onEditIndicator( event, data )"
+                                                       label="Edit"/>
+                                        </mx:HBox>
+                                    </mx:Component>
+                                </mx:itemRenderer>
+                            </mx:DataGridColumn>
+                        </ns:columns>
+                    </ns:DataGridRowColor>
+                </mx:Panel>
+            </mx:ViewStack>
+        </mx:Panel>
+    </mx:ViewStack>
+</mx:Panel>

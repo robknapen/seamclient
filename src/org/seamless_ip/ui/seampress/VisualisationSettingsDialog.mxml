@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: VisualisationSettingsDialog.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<SizeableTitleWindow
+        xmlns:mx="http://www.adobe.com/2006/mxml"
+        xmlns="org.seamless_ip.ui.common.*"
+        layout="vertical"
+        width="750"
+        height="500"
+        title="Visualisation settings"
+        showCloseButton="true"
+        borderAlpha="0.8"
+        borderColor="#e2d4b3"
+        cornerRadius="10"
+        backgroundColor="#e2d4b3"
+        creationComplete="init()"
+        xmlns:ns="org.seamless_ip.ui.seampress.*">
+
+    <mx:Metadata>
+        [Event(name="createVisualisation", type="org.seamless_ip.ui.seampress.VisualisationEvent")]
+        [Event(name="editVisualisation", type="org.seamless_ip.ui.seampress.VisualisationEvent")]
+    </mx:Metadata>
+
+    <!--
+        Dialog box to input initial properties for a new visualisation.
+
+        @author Rob Knapen
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.events.ValidationResultEvent;
+        import mx.managers.PopUpManager;
+        import mx.rpc.events.FaultEvent;
+        import mx.rpc.events.ResultEvent;
+
+        [Bindable]
+        private var _experiments:ArrayCollection;
+        [Bindable]
+        private var _indicators:ArrayCollection = new ArrayCollection();
+
+        private var _visualisation:Visualisation;
+        private var _newVisualisation:Boolean = true;
+        private var _firstWizardPage:int = 0;
+        private var _lastWizardPage:int = 2;
+
+
+        public function initialise(experiments:ArrayCollection, indicators:ArrayCollection):void {
+            _experiments = experiments;
+            _indicators = indicators;
+            visualisation = null;
+            updateWizardButtonState();
+        }
+
+
+        public function set visualisation(visualisation:Visualisation):void {
+            if (visualisation != null) {
+                _visualisation = visualisation;
+                _newVisualisation = false;
+            }
+            else {
+                _visualisation = new Visualisation();
+                _newVisualisation = true;
+            }
+
+            // set general settings widgets
+            titleInput.text = _visualisation.title;
+            authorsInput.text = _visualisation.author;
+            descriptionInput.text = _visualisation.description;
+            experimentSelectionView.updateSelection(_visualisation.baselineExperimentId, _visualisation.experimentIds);
+            indicatorSelectionView.updateSelection(_visualisation.indicatorIds);
+        }
+
+
+        private function init():void {
+            addEventListener('close', closeMe);
+            updateWizardButtonState();
+        }
+
+
+        private function next():void {
+            var current:int = dialogViewStack.selectedIndex;
+            if (current < _lastWizardPage) {
+                current++;
+                dialogViewStack.selectedIndex = current;
+                updateWizardButtonState();
+
+                if (dialogViewStack.selectedChild == indicatorSelectionView) {
+                    selectCalculatedIndicators();
+                }
+            }
+        }
+
+
+        private function back():void {
+            var current:int = dialogViewStack.selectedIndex;
+            if (current > _firstWizardPage) {
+                current--;
+                dialogViewStack.selectedIndex = current;
+                updateWizardButtonState();
+            }
+        }
+
+
+        private function updateWizardButtonState():void {
+            var current:int = dialogViewStack.selectedIndex;
+
+            // default rules
+            backButton.enabled = (current != _firstWizardPage);
+            nextButton.enabled = (current != _lastWizardPage);
+            finishButton.enabled = (current == _lastWizardPage);
+
+            // view specific rules
+            if (dialogViewStack.selectedChild == experimentSelectionView) {
+                nextButton.enabled = experimentSelectionView.getSelectedIds().length > 0;
+                finishButton.enabled = (current == _lastWizardPage);
+                return;
+            }
+
+            // view specific rules
+            if (dialogViewStack.selectedChild == indicatorSelectionView) {
+                finishButton.enabled = indicatorSelectionView.getSelectedIds().length > 0;
+                nextButton.enabled = finishButton.enabled;
+                return;
+            }
+        }
+
+
+        /**
+         * Validates the input in the form and dispatches an event with
+         * the visualisation data. Listeners to this event can use it to
+         * create the new visualisation.
+         */
+        private function submit():void {
+            if (isValid()) {
+                var v:Visualisation = _visualisation;
+                v.title = titleInput.text;
+                v.description = descriptionInput.text;
+                v.author = authorsInput.text;
+                v.baselineExperimentId = experimentSelectionView.getSelectedBaselineId();
+                v.baselineExperimentTitle = experimentSelectionView.getSelectedBaselineTitle();
+                v.experimentIds = experimentSelectionView.getSelectedIds();
+                v.indicatorIds = indicatorSelectionView.getSelectedIds();
+
+                var evt:VisualisationEvent;
+                if (_newVisualisation)
+                    evt = new VisualisationEvent(VisualisationEvent.VISUALISATION_CREATE, v);
+                else
+                    evt = new VisualisationEvent(VisualisationEvent.VISUALISATION_EDITED, v);
+
+                dispatchEvent(evt);
+
+                PopUpManager.removePopUp(this);
+            }
+        }
+
+
+        /**
+         * Checks if the input in the dialog is valid or not.
+         *
+         * @return true when all input is valid
+         */
+        private function isValid():Boolean {
+            var evt:ValidationResultEvent = validator.validate();
+            if (evt.type == ValidationResultEvent.INVALID) {
+                errorLabel.text = evt.message;
+                return false;
+            }
+
+            errorLabel.text = "";
+            return true;
+        }
+
+
+        /**
+         * Closes the dialog.
+         */
+        private function closeMe(event:Event):void {
+            PopUpManager.removePopUp(this);
+        }
+
+
+        private function selectCalculatedIndicators():void {
+            var ids:ArrayCollection = experimentSelectionView.getSelectedIds();
+            resultPresentationService.retrieveCalculatedIndicatorIds(ids);
+            dialogViewStack.selectedChild = serverCommunicationView;
+            serverCommunicationView.progressMessage = "Updating list of calculated indicators...";
+            indicatorSelectionView.enabled = false;
+        }
+
+
+        private function serverFaultHandler(event:FaultEvent):void {
+            Alert.show("Error retrieving data from server: " + event.fault.faultString, "Server error");
+            serverCommunicationView.progressMessage = "Error: " + event.fault.faultString;
+        }
+
+
+        private function retrieveCalculatedIndicatorIdsHandler(event:ResultEvent):void {
+            serverCommunicationView.progressMessage = "Done";
+            var ids:ArrayCollection = event.result as ArrayCollection; // String instances
+            // filter displayed indicator list based on received ids
+            for each (var obj:Object in _indicators) {
+                obj.setHasValues(false);
+                if (ids != null) {
+                    for each (var id:String in ids) {
+                        if (obj.id == id) {
+                            obj.setHasValues(true);
+                            break;
+                        }
+                    }
+                }
+            }
+            indicatorSelectionView.enabled = true;
+            dialogViewStack.selectedChild = indicatorSelectionView;
+        }
+			 
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Server Access
+     ===========================================================================
+     -->
+
+    <mx:RemoteObject id="resultPresentationService"
+                     destination="resultPresentationService"
+            >
+        <!-- List<String> retrieveCalculatedIndicatorIds(List<String> experimentId) -->
+        <mx:method name="retrieveCalculatedIndicatorIds"
+                   fault="serverFaultHandler(event)"
+                   result="retrieveCalculatedIndicatorIdsHandler(event)"/>
+    </mx:RemoteObject>
+
+    <!--
+     ===========================================================================
+         Validators
+     ===========================================================================
+     -->
+
+    <mx:StringValidator id="validator"
+                        source="{titleInput}" property="text"
+                        requiredFieldError="A title must be specified"
+            />
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:HBox width="100%">
+        <mx:Label text="Title:"/>
+        <mx:TextInput id="titleInput" width="100%"/>
+    </mx:HBox>
+
+    <mx:ViewStack id="dialogViewStack"
+                  width="100%" height="100%"
+                  alpha="0.5" backgroundColor="#ffffff"
+                  creationPolicy="all"
+                  paddingLeft="5" paddingRight="5"
+                  paddingBottom="5" paddingTop="5"
+            >
+
+        <ns:ExperimentSelector id="experimentSelectionView"
+                               width="100%" height="100%"
+                               experiments="{_experiments}"
+                               change="updateWizardButtonState()"
+                />
+
+        <ns:IndicatorSelector id="indicatorSelectionView"
+                              width="100%" height="100%"
+                              indicators="{_indicators}"
+                              change="updateWizardButtonState()"
+                />
+
+        <mx:VBox id="generalView"
+                 width="100%" height="100%"
+                >
+            <mx:Form width="100%" height="100%" alpha="0.5" backgroundColor="#ffffff">
+                <mx:FormHeading label="Visualisation Details"/>
+                <mx:FormItem label="Author(s):" width="100%" required="false">
+                    <mx:TextInput id="authorsInput" width="100%"/>
+                </mx:FormItem>
+                <mx:FormItem label="Description:" width="100%" height="100%">
+                    <mx:TextArea id="descriptionInput"
+                                 width="100%" height="100%"/>
+                </mx:FormItem>
+            </mx:Form>
+        </mx:VBox>
+
+        <!-- Helper screen, not part of the wizard -->
+        <ServerProgressView id="serverCommunicationView"
+                            width="100%" height="100%"/>
+
+    </mx:ViewStack>
+
+    <mx:VBox id="navigationPanel" width="100%">
+        <mx:Label id="errorLabel" width="100%" textAlign="left" color="#ff0000"/>
+        <mx:Spacer width="100%" height="100%"/>
+        <mx:HBox width="100%" horizontalAlign="center" verticalAlign="middle">
+            <mx:Button id="nextButton"
+                       label="Next" width="100"
+                       enabled="true"
+                       toolTip="Continue with next step of the wizard"
+                       click="next()"
+                    />
+            <mx:Button id="backButton"
+                       label="Back" width="100"
+                       toolTip="Back to previous step of the wizard"
+                       enabled="false"
+                       click="back()"
+                    />
+            <mx:Button id="finishButton"
+                       label="Finish" width="100"
+                       toolTip="Finish the wizard and create the visualisation"
+                       enabled="false"
+                       click="submit()"
+                       icon="@Embed('/img/icons/redo_edit.gif')"/>
+            <mx:Spacer width="100%" height="10"/>
+            <mx:Button id="cancelButton"
+                       label="Cancel" width="100"
+                       toolTip="Cancel the creation of the visualisation"
+                       enabled="true"
+                       click="closeMe(event)"
+                       icon="@Embed('/img/icons/delete_edit.gif')"/>
+        </mx:HBox>
+    </mx:VBox>
+
+</SizeableTitleWindow>

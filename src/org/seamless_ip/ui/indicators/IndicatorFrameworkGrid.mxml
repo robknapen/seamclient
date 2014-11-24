@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: IndicatorFrameworkGrid.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Canvas
+        xmlns:mx="http://www.adobe.com/2006/mxml"
+        width="100%" height="100%"
+        xmlns:if="org.seamless_ip.ui.indicators.*">
+
+    <mx:Metadata>
+        [Event(name="change")]
+    </mx:Metadata>
+
+    <!--
+    A 3x3 grid with the indicator dimensions as the columns and the generic
+    themes as the rows. The spatial scale and domain are defined externally.
+    For each cell in the grid the user can select indicators.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+
+        import org.seamless_ip.services.transferobjects.indi.Domain;
+        import org.seamless_ip.services.transferobjects.seamproj.SpatialScale;
+        import org.seamless_ip.ui.enums.EnumClassName;
+
+        [Bindable]
+        public var indicatorLibrary:IndicatorLibrary;
+        [Bindable]
+        public var selectableModels:ArrayCollection;
+        [Bindable]
+        public var editable:Boolean = false;
+
+        [Bindable]
+        private var _domains:ArrayCollection;
+        [Bindable]
+        private var _dimensions:ArrayCollection;
+        [Bindable]
+        private var _genericThemes:ArrayCollection;
+        [Bindable]
+        private var _spatialExtents:ArrayCollection;
+
+        [Bindable]
+        private var _domainName:String = "Domain";
+        [Bindable]
+        private var _spatialExtentName:String = "EU";
+        [Bindable]
+        private var _spatialResolutionName:String = "EU";
+
+        [Bindable]
+        private var _dimensionName0:String = "Environmental";
+        [Bindable]
+        private var _dimensionName1:String = "Economic";
+        [Bindable]
+        private var _dimensionName2:String = "Social";
+
+        [Bindable]
+        private var _genericThemeName0:String = "Ultimate Goal";
+        [Bindable]
+        private var _genericThemeName1:String = "Process For Achievement";
+        [Bindable]
+        private var _genericThemeName2:String = "Means";
+
+
+        private const TOOLTIP_SPATIAL_EXTENT:String =
+                "Indicators can be calculated for various geographical areas " +
+                "such as EU, Member State, NUTS2, Farmtype.";
+        private const TOOLTIP_SPATIAL_RESOLUTION:String =
+                "The finest scale at which model provides the outputs necessary to " +
+                "calculate the indicator value (Member State, NUTS2, Farmtype, and " +
+                "Agro-Environmental Zone).";
+        private const TOOLTIP_DOMAIN:String =
+                "One of the classifications to group indicators into those affecting " +
+                "agricultural sector itself and those presenting the external effects of agriculture.";
+        private const TOOLTIP_ULTIMATE_GOAL:String =
+                "Indicates how balanced the selection of indicators is. Depends on " +
+                "the choice of Spatial extent and Domain. Reflects final goal that " +
+                "a policy-maker opts to achieve when promoting a certain policy. One " +
+                "goal is identified per each dimension of sustainability. Sub-themes, " +
+                "if distinguished, are displayed below the name of each indicator.";
+        private const TOOLTIP_PROCESS_FOR_ACHIEVEMENT:String =
+                "Indicates how balanced the selection of indicators is. Sub-themes, " +
+                "if distinguished, are displayed below the name of each indicator.";
+        private const TOOLTIP_MEANS:String =
+                "Indicates how balanced the selection of indicators is. Sub-themes, " +
+                "if distinguished, are displayed below the name of each indicator.";
+
+
+        /**
+         * Returns the domain name currently used in the grid.
+         */
+        public function get domainName():String {
+            return _domainName;
+        }
+
+
+        /**
+         * Initialises the grid. Retrieves the enmeration values for the
+         * domains and spatial scales, and updates the grid accordingly.
+         */
+        public function init():void {
+            _domains = indicatorLibrary.getEnumValues(EnumClassName.DOMAIN);
+            _dimensions = indicatorLibrary.getEnumValues(EnumClassName.DIMENSION);
+            _genericThemes = indicatorLibrary.getEnumValues(EnumClassName.GENERICTHEME);
+            _spatialExtents = initSpatialScaleExtents();
+            updateGrid(false);
+        }
+
+
+        /**
+         * Returns a list of spatial scale extents, based on the available
+         * spatial scales (both spatial resolution and spatial extent) with
+         * duplicate extents removed.
+         */
+        private function initSpatialScaleExtents():ArrayCollection {
+            var result:ArrayCollection = new ArrayCollection();
+            var scales:ArrayCollection = indicatorLibrary.getEnumValues(EnumClassName.SPATIAL_SCALE);
+
+            for each (var scale:SpatialScale in scales) {
+                if (!result.contains(scale.extent))
+                    result.addItem(scale.extent);
+            }
+            return result;
+        }
+
+
+        /**
+         * Updates the settings for the grid and all of its cells to match.
+         */
+        private function updateGrid(saveFirst:Boolean = true):void {
+            _spatialExtentName = String(comboboxSpatialScale.selectedItem);
+            _spatialResolutionName = ""; // not used for selection in this version
+            _domainName = Domain(comboboxDomain.selectedItem).label_en;
+
+            updateCells();
+        }
+
+
+        /**
+         * Updates all the cells in the grid and sets them to display
+         * indicators of a specific spatial scale, domain, dimension and
+         * generic theme.
+         */
+        private function updateCells():void {
+            ifc1.init(selectableModels, _spatialExtentName, _spatialResolutionName, _domainName,
+                    _dimensions.getItemAt(0).label_en,
+                    _genericThemes.getItemAt(0).label_en);
+            ifc2.init(selectableModels, _spatialExtentName, _spatialResolutionName, _domainName,
+                    _dimensions.getItemAt(1).label_en,
+                    _genericThemes.getItemAt(0).label_en);
+            ifc3.init(selectableModels, _spatialExtentName, _spatialResolutionName, _domainName,
+                    _dimensions.getItemAt(2).label_en,
+                    _genericThemes.getItemAt(0).label_en);
+
+            ifc4.init(selectableModels, _spatialExtentName, _spatialResolutionName, _domainName,
+                    _dimensions.getItemAt(0).label_en,
+                    _genericThemes.getItemAt(1).label_en);
+            ifc5.init(selectableModels, _spatialExtentName, _spatialResolutionName, _domainName,
+                    _dimensions.getItemAt(1).label_en,
+                    _genericThemes.getItemAt(1).label_en);
+            ifc6.init(selectableModels, _spatialExtentName, _spatialResolutionName, _domainName,
+                    _dimensions.getItemAt(2).label_en,
+                    _genericThemes.getItemAt(1).label_en);
+
+            ifc7.init(selectableModels, _spatialExtentName, _spatialResolutionName, _domainName,
+                    _dimensions.getItemAt(0).label_en,
+                    _genericThemes.getItemAt(2).label_en);
+            ifc8.init(selectableModels, _spatialExtentName, _spatialResolutionName, _domainName,
+                    _dimensions.getItemAt(1).label_en,
+                    _genericThemes.getItemAt(2).label_en);
+            ifc9.init(selectableModels, _spatialExtentName, _spatialResolutionName, _domainName,
+                    _dimensions.getItemAt(2).label_en,
+                    _genericThemes.getItemAt(2).label_en);
+        }
+
+
+        /**
+         * Handles change notifications from the cells.
+         */
+        private function changed(event:Event):void {
+            updateCells();
+            dispatchEvent(new Event("change"));
+        }
+
+
+        /**
+         * Label function for Domain instances.
+         */
+        private function domainLabel(item:Object):String {
+            if (item is Domain)
+                return Domain(item).label_en;
+            else
+                return "Unknown";
+        }
+			
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:VBox
+            width="100%"
+            height="100%"
+            backgroundColor="#FFFFFF"
+            backgroundAlpha="0.5"
+            >
+
+        <mx:Grid
+                width="100%"
+                height="100%"
+                label="{_domainName}"
+                horizontalGap="3"
+                verticalGap="3"
+                verticalAlign="middle"
+                borderStyle="solid"
+                cornerRadius="5"
+                backgroundColor="#FFFFFF"
+                >
+            <mx:GridRow width="100%" horizontalAlign="center" verticalAlign="middle">
+                <mx:GridItem width="100" height="100%"
+                             backgroundColor="#DCDCD0" backgroundAlpha="0.1"
+                             colSpan="4">
+
+                    <mx:HBox
+                            width="100%" height="100%"
+                            horizontalAlign="right" verticalAlign="middle" borderStyle="none" cornerRadius="0"
+                            paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" horizontalGap="2"
+                            >
+                        <mx:Label text="Spatial Extent:"
+                                  width="100" textAlign="right"
+                                  toolTip="{TOOLTIP_SPATIAL_EXTENT}"/>
+                        <mx:ComboBox id="comboboxSpatialScale"
+                                     dataProvider="{_spatialExtents}"
+                                     change="updateGrid()"
+                                     enabled="true"
+                                     width="100%"
+                                     toolTip="{TOOLTIP_SPATIAL_EXTENT}"
+                                />
+                        <mx:Spacer width="50%"/>
+                        <mx:Label text="Domain:" textAlign="right"
+                                  toolTip="{TOOLTIP_DOMAIN}"/>
+                        <mx:ComboBox id="comboboxDomain"
+                                     dataProvider="{_domains}"
+                                     labelFunction="{domainLabel}"
+                                     change="updateGrid()"
+                                     enabled="true"
+                                     width="100%"
+                                     toolTip="{TOOLTIP_DOMAIN}"
+                                />
+                    </mx:HBox>
+
+                </mx:GridItem>
+            </mx:GridRow>
+            <mx:GridRow width="100%" height="20" horizontalAlign="center" verticalAlign="middle">
+                <mx:GridItem width="100" height="100%"
+                             backgroundColor="#DCDCD0" backgroundAlpha="0.2">
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%" verticalAlign="middle"
+                             backgroundColor="#DCDCD0" backgroundAlpha="0.2">
+                    <mx:Label text="{_dimensions.getItemAt(0).label_en}"
+                              width="100%" textAlign="center" fontWeight="bold" fontSize="9"/>
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%" verticalAlign="middle"
+                             backgroundColor="#DCDCD0" backgroundAlpha="0.2">
+                    <mx:Label text="{_dimensions.getItemAt(1).label_en}"
+                              width="100%" textAlign="center" fontWeight="bold" fontSize="9"/>
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%" verticalAlign="middle"
+                             backgroundColor="#DCDCD0" backgroundAlpha="0.2">
+                    <mx:Label text="{_dimensions.getItemAt(2).label_en}"
+                              width="100%" textAlign="center" fontWeight="bold" fontSize="9"/>
+                </mx:GridItem>
+            </mx:GridRow>
+            <mx:GridRow width="100%" height="100%" verticalAlign="middle">
+                <mx:GridItem width="100" verticalAlign="middle"
+                             backgroundColor="#DCDCD0" backgroundAlpha="0.2">
+                    <mx:TextArea width="100%" wordWrap="true"
+                                 textAlign="center" text="{_genericThemes.getItemAt(0).label_en}"
+                                 borderStyle="none" alpha="0.0" fontWeight="bold" fontSize="9"
+                                 toolTip="{TOOLTIP_ULTIMATE_GOAL}"
+                            />
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%">
+                    <if:IndicatorFrameworkCell id="ifc1"
+                                               width="100%" height="100%"
+                                               editable="{editable}"
+                                               indicatorLibrary="{indicatorLibrary}"
+                                               change="changed(event)"
+                            />
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%">
+                    <if:IndicatorFrameworkCell id="ifc2"
+                                               width="100%" height="100%"
+                                               editable="{editable}"
+                                               indicatorLibrary="{indicatorLibrary}"
+                                               change="changed(event)"
+                            />
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%">
+                    <if:IndicatorFrameworkCell id="ifc3"
+                                               width="100%" height="100%"
+                                               editable="{editable}"
+                                               indicatorLibrary="{indicatorLibrary}"
+                                               change="changed(event)"
+                            />
+                </mx:GridItem>
+            </mx:GridRow>
+            <mx:GridRow width="100%" height="100%">
+                <mx:GridItem width="100" height="100%" verticalAlign="middle"
+                             backgroundColor="#DCDCD0" backgroundAlpha="0.2">
+                    <mx:TextArea width="100%" wordWrap="true"
+                                 textAlign="center" text="{_genericThemes.getItemAt(1).label_en}"
+                                 borderStyle="none" alpha="0.0" fontWeight="bold" fontSize="9"
+                                 toolTip="{TOOLTIP_PROCESS_FOR_ACHIEVEMENT}"
+                            />
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%">
+                    <if:IndicatorFrameworkCell id="ifc4"
+                                               width="100%" height="100%"
+                                               editable="{editable}"
+                                               indicatorLibrary="{indicatorLibrary}"
+                                               change="changed(event)"
+                            />
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%">
+                    <if:IndicatorFrameworkCell id="ifc5"
+                                               width="100%" height="100%"
+                                               editable="{editable}"
+                                               indicatorLibrary="{indicatorLibrary}"
+                                               change="changed(event)"
+                            />
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%">
+                    <if:IndicatorFrameworkCell id="ifc6"
+                                               width="100%" height="100%"
+                                               editable="{editable}"
+                                               indicatorLibrary="{indicatorLibrary}"
+                                               change="changed(event)"
+                            />
+                </mx:GridItem>
+            </mx:GridRow>
+            <mx:GridRow width="100%" height="100%">
+                <mx:GridItem width="100" height="100%" verticalAlign="middle"
+                             backgroundColor="#DCDCD0" backgroundAlpha="0.2">
+                    <mx:TextArea width="100%" wordWrap="true"
+                                 textAlign="center" text="{_genericThemes.getItemAt(2).label_en}"
+                                 borderStyle="none" alpha="0.0" fontWeight="bold" fontSize="9"
+                                 toolTip="{TOOLTIP_MEANS}"
+                            />
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%">
+                    <if:IndicatorFrameworkCell id="ifc7"
+                                               width="100%" height="100%"
+                                               editable="{editable}"
+                                               indicatorLibrary="{indicatorLibrary}"
+                                               change="changed(event)"
+                            />
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%">
+                    <if:IndicatorFrameworkCell id="ifc8"
+                                               width="100%" height="100%"
+                                               editable="{editable}"
+                                               indicatorLibrary="{indicatorLibrary}"
+                                               change="changed(event)"
+                            />
+                </mx:GridItem>
+                <mx:GridItem width="100%" height="100%">
+                    <if:IndicatorFrameworkCell id="ifc9"
+                                               width="100%" height="100%"
+                                               editable="{editable}"
+                                               indicatorLibrary="{indicatorLibrary}"
+                                               change="changed(event)"
+                            />
+                </mx:GridItem>
+            </mx:GridRow>
+        </mx:Grid>
+
+    </mx:VBox>
+
+</mx:Canvas>

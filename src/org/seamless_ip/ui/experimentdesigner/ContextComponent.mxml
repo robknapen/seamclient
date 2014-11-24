@@ -1,0 +1,626 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: ContextComponent.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+           width="100%" height="100%" xmlns:ns="org.seamless_ip.ui.common.*"
+           creationComplete="{init()}">
+
+    <mx:Script>
+	<![CDATA[
+		import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.core.IFlexDisplayObject;
+        import mx.managers.PopUpManager;
+        import mx.rpc.events.FaultEvent;
+        import mx.rpc.events.ResultEvent;
+        import mx.utils.ObjectUtil;
+
+        import org.seamless_ip.services.remoting.RequestProgressEvent;
+        import org.seamless_ip.services.transferobjects.crop.Crop;
+        import org.seamless_ip.services.transferobjects.farm.RepresentativeFarm;
+        import org.seamless_ip.services.transferobjects.prodent.ProductionOrientation;
+        import org.seamless_ip.services.transferobjects.seamproj.Context;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        [Bindable]
+        private var _contextService:ContextService;
+
+        [Bindable]
+        private var _user:User = new User();
+
+        public function set user(user:User):void {
+            _user = user;
+        }
+
+        [Bindable]
+        private var _showCtrl:Boolean = false;
+
+        public function set showCtrl(showCtrl:Boolean) : void
+        {
+            _showCtrl = showCtrl;
+        }
+
+
+        private function clearData():void {
+            myNutrientmanagement = null;
+            myNutrientmanagementCrops = null;
+            myProductionOrientation = null;
+            myRepresentativeFarm = null;
+            myWatermanagementCrops = null;
+        }
+
+        [Bindable]
+        private var _project:Project;
+
+        public function set project(project:Project):void
+        {
+            _project = project;
+        }
+
+        public function get ContextServiceSingelton():ContextService
+        {
+            if (_contextService == null) {
+                _contextService = new ContextService();
+                _contextService.addEventListener(RequestProgressEvent.REQUEST_SEND, RequestSend);
+                _contextService.addEventListener(RequestProgressEvent.REQUEST_COMPLETED, RequestCompleted);
+            }
+            return _contextService;
+        }
+
+        public function RequestSend(event:RequestProgressEvent):void {
+
+            // do something with
+            // event.message
+        }
+
+        public function RequestCompleted(event:RequestProgressEvent):void {
+            // do something with
+            for each (var con:Context in ContextServiceSingelton.contexts) {
+                context = con;
+            }
+            myRepresentativeFarm = context.representativeFarm;
+
+            fillContextTables();
+        }
+
+
+        // Experiment id
+        private var _experimentID:Number = NaN;
+
+
+        [Bindable]
+        private var _context: Context;
+
+        public function get context(): Context {
+            return _context;
+        }
+
+        public function set context(context:Context): void {
+            _context = context;
+        }
+
+        [Bindable]
+        public var myRepresentativeFarm:ArrayCollection;
+
+        // Use for both water and nutrtionmanagement
+        [Bindable]
+        public var myProductionOrientation:ProductionOrientation;
+
+        [Bindable]
+        public var myWatermanagementCrops:ArrayCollection;
+
+        [Bindable]
+        public var myNutrientmanagementCrops:ArrayCollection;
+
+        [Bindable]
+        public var myNutrientmanagement:ArrayCollection;
+
+
+        public function init(): void
+        {
+
+
+        }
+
+        public function editable():void {
+            var editable:Boolean = _user.canDoForProject(_project.id, "UPDATE", "EXPERIMENT");
+            dgRepresentativeFarms.editable = editable;
+            dgNutrientmanagementCrops.editable = editable;
+            dgWatermanagementCrops.editable = editable;
+            frmNutrient.enabled = editable;
+            frmWaN.enabled = editable;
+            enableAllNutrient.enabled = editable;
+            enableAllWater.enabled = editable;
+            enableFarmTypes.enabled = editable;
+        }
+
+        // Set experiment id
+        public function set experimentID(experimentID:Number):void {
+            _experimentID = experimentID;
+        }
+
+        public function get experimentID():Number {
+            return _experimentID;
+        }
+
+
+        public function fillContextTables():void
+        {
+            // This will only work if there is only one productionOrientation in the database...
+            // and due to Sander there will only be one!
+            for each (var pO:ProductionOrientation  in context.productionOrientation) {
+                myProductionOrientation = pO;
+                myWatermanagementCrops = pO.watermanagement.crops;
+                myNutrientmanagementCrops = pO.nutrientmanagement.crops
+
+                //	myNutrientmanagement = pO.nutrientmanagement; //.expectedTargetYield;
+                //.distributionOrganicFertiliser;
+            }
+            if (isUpdateing) {
+                dispatchEvent(new ExperimentDesignerEvent(ExperimentDesignerEvent.EXPERIMENT_CONTEXT_SAVE_READY));
+                isUpdateing = false;
+            } else {
+                dispatchEvent(new ExperimentDesignerEvent(ExperimentDesignerEvent.EXPERIMENT_CONTEXT_LOAD_READY));
+            }
+
+
+        }
+
+
+        [Bindable]
+        private var modelChainName:String = "FSSIMCAPRI";
+
+        public function set modelChain(name:String):void {
+            modelChainName = name;
+            enableTabs();
+
+        }
+
+        private function enableTabs():void {
+            tabFarm.enabled = false;
+            tabWater.enabled = false;
+            tabNutrient.enabled = false;
+            // Enable FSSIM screens
+            if (modelChainName.toUpperCase().search("FSSIM") != -1) {
+                tabFarm.enabled = true;
+                tabWater.enabled = true;
+                tabNutrient.enabled = true;
+            }
+
+            // Enable CAPRI screens
+            if (modelChainName.toUpperCase().search("CAPRI") != -1) {
+
+            }
+        }
+
+
+        public function deleteContext_callback(event:ResultEvent):void
+        {
+            // Delete is not allowed
+        }
+
+        public function readDataFaultHandler(event:FaultEvent):void
+        {
+            Alert.show(event.message.toString(), "Error on the server (Blaze and Hibernate generate exception)");
+        }
+
+        public function getContext():void
+        {
+            editable();
+            ContextServiceSingelton.findById(experimentID);
+        }
+
+
+        private var isUpdateing:Boolean = false;
+
+        public function updateContext():void
+        {
+            fixWaN();
+            isUpdateing = true;
+            ContextServiceSingelton.update(context);
+        }
+
+        private function fixWaN():void {
+            myProductionOrientation.watermanagement.potentialIrrigation = chbPotentialIrrigation.selected;
+            myProductionOrientation.watermanagement.demandBasedIrrigation = chbDemandBasedIrrigation.selected;
+            myProductionOrientation.watermanagement.userDefinedIrrigation = chbUserDefinedIrrigation.selected;
+            myProductionOrientation.watermanagement.changeNutrientManagement = chbChangeNutrientManagement.selected;
+
+            myProductionOrientation.watermanagement.endDay = parseInt(txtEndDay.text);
+            myProductionOrientation.watermanagement.startDay = parseInt(txtStartDay.text);
+            myProductionOrientation.watermanagement.irrigationWaterVolume = sliderIrrigationWaterVolume.value;
+            myProductionOrientation.watermanagement.numberOfRepetitions = sliderNumberOfRepetitions.value;
+            myProductionOrientation.watermanagement.plantAvailableWaterThreshold = sliderPlantAvailableWaterThreshold.value;
+
+            myProductionOrientation.nutrientmanagement.numberLevels = parseInt(chbNumberLevels.text);
+            myProductionOrientation.nutrientmanagement.yieldchange25percent = rdbYieldchange25percent.selected;
+            myProductionOrientation.nutrientmanagement.yieldchange33percent = rdbYieldchange33percent.selected;
+            myProductionOrientation.nutrientmanagement.yieldchange40percent = rdbYieldchange40percent.selected;
+
+
+        }
+
+
+        /* private function labelRFirrigatedArea(item:Object, column:DataGridColumn):String {
+         return ((RepresentativeFarm)(item)).cropInformation.irrigatedArea;
+         } */
+
+        /* 	private function labelWMendDay(item:Object, column:DataGridColumn):String {
+         return ((ProductionOrientation)(item)).watermanagement.endDay;
+         }
+         private function labelWMstartDay(item:Object, column:DataGridColumn):String {
+         return ((ProductionOrientation)(item)).watermanagement.startDay;
+         }
+         private function labelWMPAWThreshold(item:Object, column:DataGridColumn):String {
+         return ((ProductionOrientation)(item)).watermanagement.plantAvailableWaterThreshold;
+         }
+         private function labelWMnumberOfRepetitions(item:Object, column:DataGridColumn):String {
+         return ((ProductionOrientation)(item)).watermanagement.numberOfRepetitions;
+         }
+         private function labelWMiWVolume(item:Object, column:DataGridColumn):String {
+         return ((ProductionOrientation)(item)).watermanagement.irrigationWaterVolume;
+         }	 */
+        private function rowColorRF(item:Object, color:uint):uint
+        {
+            return color;
+        }
+
+        private function selectAllFarms(sel:Boolean):void {
+            for each (var rep:RepresentativeFarm in myRepresentativeFarm) {
+                rep.selected = sel;
+            }
+        }
+
+        private function selectAllWater(sel:Boolean):void {
+            for each (var rep:Crop in myWatermanagementCrops) {
+                rep.selected = sel;
+            }
+        }
+
+        private function selectAllNutrient(sel:Boolean):void {
+            for each (var rep:Crop in myNutrientmanagementCrops) {
+                rep.selected = sel;
+            }
+        }
+
+        //show a modal dialog to choose the Day of the year
+        private function showDlg(mode:String/* "start" | "end" */):void {
+
+            var myPopUp:IFlexDisplayObject = PopUpManager.createPopUp(this, DaySelectionDlg, true);
+
+            if (mode == "start")
+            {
+                DaySelectionDlg(myPopUp).Offset = myProductionOrientation.watermanagement.endDay;
+                DaySelectionDlg(myPopUp).Mode = DaySelectionDlg.MODE_RANGESTART;
+                DaySelectionDlg(myPopUp).Selecteddayoftheyear = myProductionOrientation.watermanagement.startDay;
+            }
+            else if (mode == "end")
+            {
+
+                DaySelectionDlg(myPopUp).Offset = myProductionOrientation.watermanagement.startDay;
+                DaySelectionDlg(myPopUp).Mode = DaySelectionDlg.MODE_RANGEEND;
+                DaySelectionDlg(myPopUp).Selecteddayoftheyear = myProductionOrientation.watermanagement.endDay;
+            }
+
+
+            PopUpManager.centerPopUp(myPopUp);
+            myPopUp.addEventListener(Event.COMPLETE, function(popupevent:Event):void {
+                if (mode == "start")
+                    myProductionOrientation.watermanagement.startDay = DaySelectionDlg(myPopUp).Selecteddayoftheyear;
+                else if (mode == "end")
+                    myProductionOrientation.watermanagement.endDay = DaySelectionDlg(myPopUp).Selecteddayoftheyear;
+                PopUpManager.removePopUp(myPopUp);
+            }
+                    );
+        }
+		
+		]]>
+</mx:Script>
+    <mx:Script source="GridFunctions.as"/>
+    <mx:NumberFormatter precision="2" id="nf2"/>
+    <mx:Panel layout="vertical" height="100%" width="100%"
+              id="contextPanel">
+        <mx:TabBar id="toolBarContext"
+                   dataProvider="view" width="100%"/>
+        <mx:ViewStack id="view" width="100%" height="100%">
+            <!-- Farm type  -->
+            <mx:Panel label="Farm type" width="100%" height="100%" layout="vertical" id="tabFarm">
+                <!-- represenativefarm -->
+
+                <mx:HBox width="100%" id="enableFarmTypes"
+                         visible="{_showCtrl}"
+                         includeInLayout="{_showCtrl}">
+                    <mx:Button label="Select all" click="{selectAllFarms(true)}" id="btnSelectAll"/>
+                    <mx:Button label="Deselect all" click="{selectAllFarms(false)}" id="btnDeselectAll"/>
+                </mx:HBox>
+
+
+                <mx:Script>
+                    <![CDATA[
+                    private function labelRepresentativeFarm(item:Object, column:DataGridColumn):String {
+                        return ((RepresentativeFarm)(item)).FADNRegion.name;
+                    }
+
+                    private function sortRepresentativeFarm(obj1:RepresentativeFarm, obj2:RepresentativeFarm):int {
+                        // Use farmtype (description) to int the sorting
+                        return ObjectUtil.stringCompare(
+                                obj1.FADNRegion.name + obj1.description, obj2.FADNRegion.name + obj2.description);
+                    }
+                    ]]>
+                </mx:Script>
+
+                <ns:DataGridRowColor id="dgRepresentativeFarms"
+                                     width="100%" height="100%"
+                                     dataProvider="{myRepresentativeFarm}"
+                                     editable="true"
+                                     rowColorFunction="rowColorRF"
+                                     allowMultipleSelection="true"
+                                     sortableColumns="true">
+                    <ns:columns>
+                        <!-- checkbox -->
+                        <mx:DataGridColumn headerText=""
+                                           dataField="selected" width="20"
+                                           editable="false"
+                                           sortable="false"
+                                           itemRenderer="org.seamless_ip.ui.experimentdesigner.CheckboxRenderer"/>
+                        <mx:DataGridColumn headerText="Region"
+                                           sortCompareFunction="sortRepresentativeFarm"
+                                           labelFunction="labelRepresentativeFarm"
+                                           editable="false"/>
+                        <mx:DataGridColumn headerText="Farm type"
+                                           editable="false"
+                                           dataField="description"
+                                />
+                        <!-- year -->
+                        <ns:FormattedDataGridColomn headerText="Year"
+                                                    percision="0"
+                                                    textAlign="left"
+                                                    dataField="year"
+                                                    editable="false"/>
+                        <!-- representedfarms -->
+                        <ns:FormattedDataGridColomn headerText="Number of farms"
+                                                    percision="0"
+                                                    textAlign="right"
+                                                    dataField="representedFarms"
+                                                    editable="false"/>
+                        <!-- Farm size -->
+                        <ns:FormattedDataGridColomn headerText="Avg farmed area (ha)"
+                                                    percision="0"
+                                                    dataField="utilisedAgriculturalAreaAvgPerFarm"
+                                                    textAlign="right"
+                                                    editable="false"/>
+                        <!-- labourInput-->
+                        <ns:FormattedDataGridColomn headerText="Avg labour use (hour/y)"
+                                                    percision="0"
+                                                    dataField="labourInputsAvgPerFarm"
+                                                    textAlign="right"
+                                                    editable="false"/>
+                    </ns:columns>
+                </ns:DataGridRowColor>
+
+            </mx:Panel>
+
+
+            <!-- Water management  -->
+            <mx:Panel width="100%"
+                      visible="false"
+                      height="100%"
+                      label="Water management"
+                      toolTip=""
+                      layout="vertical"
+                      id="tabWater">
+                <mx:HBox width="100%" id="enableAllWater"
+                         visible="{_showCtrl}"
+                         includeInLayout="{_showCtrl}">
+                    <mx:Button label="Select all" click="{selectAllWater(true)}"/>
+                    <mx:Button label="Deselect all" click="{selectAllWater(false)}"/>
+                </mx:HBox>
+                <mx:HBox height="100%" width="100%">
+
+                    <!-- list with checkboxes and crops -->
+                    <mx:DataGrid width="100%" height="100%"
+                                 id="dgWatermanagementCrops"
+                                 dataProvider="{myWatermanagementCrops}"
+                                 editable="false">
+                        <mx:columns>
+                            <!-- checkboxcolumn -->
+                            <mx:DataGridColumn headerText="" width="20"
+                                               itemRenderer="org.seamless_ip.ui.experimentdesigner.CheckboxRenderer"
+                                               editable="false"/>
+                            <mx:DataGridColumn headerText="Included crops" dataField="label_en"/>
+                        </mx:columns>
+                    </mx:DataGrid>
+                    <mx:Form width="50%" height="100%" id="frmWaN">
+                        <mx:FormItem>
+                            <mx:CheckBox label="Potential Irrigation (&gt;20 events + trigger at high PAW)"
+                                         selected="{myProductionOrientation.watermanagement.potentialIrrigation}"
+                                         id="chbPotentialIrrigation"/>
+                        </mx:FormItem>
+                        <mx:FormItem>
+                            <mx:CheckBox label="Meeting water demand based on PAW"
+                                         toolTip="PAW&lt;0.8 for water-sensitive crops and PAW &lt;0.6 for non water sensitive crops, while irrigation amount calculated to restore field capacity at event."
+                                         selected="{myProductionOrientation.watermanagement.demandBasedIrrigation}"
+                                         id="chbDemandBasedIrrigation"/>
+                        </mx:FormItem>
+                        <mx:FormItem>
+                            <mx:CheckBox id="chbUserDefinedIrrigation" label="User defined water management"
+                                         selected="{myProductionOrientation.watermanagement.userDefinedIrrigation}"/>
+                        </mx:FormItem>
+                        <mx:FormItem>
+                            <mx:Form width="100%" height="100%" enabled="{chbUserDefinedIrrigation.selected}">
+                                <mx:FormItem width="100%" label="Start period">
+                                    <mx:HBox width="100%">
+                                        <mx:Label width="50" text="{myProductionOrientation.watermanagement.startDay}"
+                                                  id="txtStartDay"/>
+                                        <mx:Button id="selectstartdaybtn"
+                                                   label="select"
+                                                   click="showDlg('start')">
+                                        </mx:Button>
+                                    </mx:HBox>
+
+                                </mx:FormItem>
+                                <mx:FormItem width="100%" label="End period">
+                                    <mx:HBox width="100%">
+                                        <mx:Label width="50" text="{myProductionOrientation.watermanagement.endDay}"
+                                                  id="txtEndDay"/>
+                                        <mx:Button id="selectenddaybtn"
+                                                   label="select"
+                                                   click="showDlg('end')"
+                                                >
+                                        </mx:Button>
+                                    </mx:HBox>
+                                </mx:FormItem>
+                                <mx:FormItem width="100%" label="PAW threshold (%)">
+                                    <mx:HSlider id="sliderPlantAvailableWaterThreshold"
+                                                width="100%"
+                                                value="{myProductionOrientation.watermanagement.plantAvailableWaterThreshold}"
+                                                minimum="0" maximum="1"
+                                                tickColor="black"
+                                                snapInterval="0.01"
+                                                tickInterval="0.25"
+                                                labels="[0, 25, 50, 75, 100]"/>
+                                </mx:FormItem>
+                                <mx:FormItem width="100%" label="Repetitions">
+                                    <mx:HSlider id="sliderNumberOfRepetitions"
+                                                width="100%"
+                                                value="{myProductionOrientation.watermanagement.numberOfRepetitions}"
+                                                minimum="1" maximum="15"
+                                                tickColor="black"
+                                                tickInterval="1"
+                                                snapInterval="1"
+                                                labels="[1, 15]"/>
+                                </mx:FormItem>
+                                <mx:FormItem width="100%" label="Water (mm/ha) per repetiton">
+                                    <mx:HSlider id="sliderIrrigationWaterVolume"
+                                                width="100%"
+                                                value="{myProductionOrientation.watermanagement.irrigationWaterVolume}"
+                                                minimum="5" maximum="150"
+                                                tickColor="black"
+                                                tickInterval="29"
+                                                snapInterval="1"
+                                                labels="[5, 150]"/>
+                                </mx:FormItem>
+                            </mx:Form>
+                        </mx:FormItem>
+                        <mx:FormItem>
+                            <mx:CheckBox label="Changed nutrient management"
+                                         toolTip="Always selected, if one of three irrigation options are selected"
+                                         selected="{myProductionOrientation.watermanagement.changeNutrientManagement}"
+                                         id="chbChangeNutrientManagement"/>
+                        </mx:FormItem>
+                    </mx:Form>
+                </mx:HBox>
+
+            </mx:Panel>
+
+
+            <!-- Nutrient management  -->
+            <mx:Panel
+                    visible="false"
+                    width="100%"
+                    height="100%"
+                    label="Nutrient management  "
+                    toolTip="Tooltip missing"
+                    layout="vertical"
+                    id="tabNutrient">
+
+                <mx:HBox width="100%" id="enableAllNutrient"
+                         visible="{_showCtrl}"
+                         includeInLayout="{_showCtrl}">
+                    <mx:Button label="Select all" click="{selectAllNutrient(true)}"/>
+                    <mx:Button label="Deselect all" click="{selectAllNutrient(false)}"/>
+                </mx:HBox>
+
+                <!-- list with checkboxes and crops -->
+                <mx:HBox height="100%" width="100%">
+
+                    <mx:DataGrid
+                            id="dgNutrientmanagementCrops"
+                            width="50%" height="100%" dataProvider="{myNutrientmanagementCrops}"
+                            editable="false">
+                        <mx:columns>
+                            <mx:DataGridColumn headerText="" width="20"
+                                               itemRenderer="org.seamless_ip.ui.experimentdesigner.CheckboxRenderer"/>
+                            <mx:DataGridColumn headerText="Included crops" dataField="label_en"/>
+                        </mx:columns>
+                    </mx:DataGrid>
+                    <mx:Form width="50%" height="100%" id="frmNutrient">
+                        <mx:FormItem
+                                label="Targeted change in yield relative to the yield in the current activities of these crops:"
+                                >
+                            <mx:RadioButton label="  75-125%"
+                                            selected="{myProductionOrientation.nutrientmanagement.yieldchange25percent}"
+                                            id="rdbYieldchange25percent"/>
+                            <mx:RadioButton label="  66-133%"
+                                            selected="{myProductionOrientation.nutrientmanagement.yieldchange33percent}"
+                                            id="rdbYieldchange33percent"/>
+                            <mx:RadioButton label="  60-140%"
+                                            selected="{myProductionOrientation.nutrientmanagement.yieldchange40percent}"
+                                            id="rdbYieldchange40percent"/>
+                        </mx:FormItem>
+
+                        <mx:FormItem label="Number of levels to be simulated within this yield range:">
+                            <mx:ComboBox text="{myProductionOrientation.nutrientmanagement.numberLevels}"
+                                         id="chbNumberLevels"
+                                         toolTip="2 = only highest and lowest; 3 = highest, lowest and average; 4 = highest, second highest, average, lowest, 5 = highest, 2nd highest, average, 2nd lowest, lowest">
+                                <mx:dataProvider>
+                                    <mx:Array>
+                                        <mx:String>2</mx:String>
+                                        <mx:String>3</mx:String>
+                                        <mx:String>4</mx:String>
+                                        <mx:String>5</mx:String>
+                                    </mx:Array>
+                                </mx:dataProvider>
+                            </mx:ComboBox>
+                        </mx:FormItem>
+                    </mx:Form>
+
+                    <!--	<mx:DataGrid  width="100%" dataProvider="myNutrientmanagement">
+                                         <mx:columns>-->
+                    <!-- Range 1-100   -->
+                    <!--		<mx:DataGridColumn headerText="Share organic (%)" dataField="col2"/>
+                                         </mx:columns>
+                                     </mx:DataGrid>
+                                     <mx:DataGrid width="100%" dataProvider="myNutrientmanagement">
+                                         <mx:columns>-->
+                    <!-- Range -50-50  (int) and should be greater then start period -->
+                    <!--		<mx:DataGridColumn headerText="Expected yield (%)" dataField="col2"/>
+                                         </mx:columns>
+                                     </mx:DataGrid>-->
+                </mx:HBox>
+
+            </mx:Panel>
+
+        </mx:ViewStack>
+    </mx:Panel>
+
+</mx:Canvas>

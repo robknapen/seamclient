@@ -1,0 +1,93 @@
+
+.backgroundInformation
+{
+	disabledSkin: Embed(source="SeamlessSkin.swf", symbol="background-information_disabledSkin");
+	downSkin: Embed(source="SeamlessSkin.swf", symbol="background-information_downSkin");
+	overSkin: Embed(source="SeamlessSkin.swf", symbol="background-information_overSkin");
+	selectedDisabledSkin: Embed(source="SeamlessSkin.swf", symbol="background-information_selectedDisabledSkin");
+	selectedDownSkin: Embed(source="SeamlessSkin.swf", symbol="background-information_selectedDownSkin");
+	selectedOverSkin: Embed(source="SeamlessSkin.swf", symbol="background-information_selectedOverSkin");
+	selectedUpSkin: Embed(source="SeamlessSkin.swf", symbol="background-information_selectedUpSkin");
+	upSkin: Embed(source="SeamlessSkin.swf", symbol="background-information_upSkin");
+}
+.boog
+{
+	upSkin: Embed(source="SeamlessSkin.swf", symbol="boog_upSkin");
+}
+.experimentNarratives
+{
+	disabledSkin: Embed(source="SeamlessSkin.swf", symbol="experiment-narratives_disabledSkin");
+	downSkin: Embed(source="SeamlessSkin.swf", symbol="experiment-narratives_downSkin");
+	overSkin: Embed(source="SeamlessSkin.swf", symbol="experiment-narratives_overSkin");
+	selectedDisabledSkin: Embed(source="SeamlessSkin.swf", symbol="experiment-narratives_selectedDisabledSkin");
+	selectedDownSkin: Embed(source="SeamlessSkin.swf", symbol="experiment-narratives_selectedDownSkin");
+	selectedOverSkin: Embed(source="SeamlessSkin.swf", symbol="experiment-narratives_selectedOverSkin");
+	selectedUpSkin: Embed(source="SeamlessSkin.swf", symbol="experiment-narratives_selectedUpSkin");
+	upSkin: Embed(source="SeamlessSkin.swf", symbol="experiment-narratives_upSkin");
+}
+.indicators
+{
+	disabledSkin: Embed(source="SeamlessSkin.swf", symbol="indicators_disabledSkin");
+	downSkin: Embed(source="SeamlessSkin.swf", symbol="indicators_downSkin");
+	overSkin: Embed(source="SeamlessSkin.swf", symbol="indicators_overSkin");
+	selectedDisabledSkin: Embed(source="SeamlessSkin.swf", symbol="indicators_selectedDisabledSkin");
+	selectedDownSkin: Embed(source="SeamlessSkin.swf", symbol="indicators_selectedDownSkin");
+	selectedOverSkin: Embed(source="SeamlessSkin.swf", symbol="indicators_selectedOverSkin");
+	selectedUpSkin: Embed(source="SeamlessSkin.swf", symbol="indicators_selectedUpSkin");
+	upSkin: Embed(source="SeamlessSkin.swf", symbol="indicators_upSkin");
+}
+.institutionalAnalysis
+{
+	disabledSkin: Embed(source="SeamlessSkin.swf", symbol="institutional-analysis_disabledSkin");
+	downSkin: Embed(source="SeamlessSkin.swf", symbol="institutional-analysis_downSkin");
+	overSkin: Embed(source="SeamlessSkin.swf", symbol="institutional-analysis_overSkin");
+	selectedDisabledSkin: Embed(source="SeamlessSkin.swf", symbol="institutional-analysis_selectedDisabledSkin");
+	selectedDownSkin: Embed(source="SeamlessSkin.swf", symbol="institutional-analysis_selectedDownSkin");
+	selectedOverSkin: Embed(source="SeamlessSkin.swf", symbol="institutional-analysis_selectedOverSkin");
+	selectedUpSkin: Embed(source="SeamlessSkin.swf", symbol="institutional-analysis_selectedUpSkin");
+	upSkin: Embed(source="SeamlessSkin.swf", symbol="institutional-analysis_upSkin");
+}
+.modeling
+{
+	disabledSkin: Embed(source="SeamlessSkin.swf", symbol="modeling_disabledSkin");
+	downSkin: Embed(source="SeamlessSkin.swf", symbol="modeling_downSkin");
+	overSkin: Embed(source="SeamlessSkin.swf", symbol="modeling_overSkin");
+	selectedDisabledSkin: Embed(source="SeamlessSkin.swf", symbol="modeling_selectedDisabledSkin");
+	selectedDownSkin: Embed(source="SeamlessSkin.swf", symbol="modeling_selectedDownSkin");
+	selectedOverSkin: Embed(source="SeamlessSkin.swf", symbol="modeling_selectedOverSkin");
+	selectedUpSkin: Embed(source="SeamlessSkin.swf", symbol="modeling_selectedUpSkin");
+	upSkin: Embed(source="SeamlessSkin.swf", symbol="modeling_upSkin");
+}
+.projectDefinition
+{
+	disabledSkin: Embed(source="SeamlessSkin.swf", symbol="project-definition_disabledSkin");
+	downSkin: Embed(source="SeamlessSkin.swf", symbol="project-definition_downSkin");
+	overSkin: Embed(source="SeamlessSkin.swf", symbol="project-definition_overSkin");
+	selectedDisabledSkin: Embed(source="SeamlessSkin.swf", symbol="project-definition_selectedDisabledSkin");
+	selectedDownSkin: Embed(source="SeamlessSkin.swf", symbol="project-definition_selectedDownSkin");
+	selectedOverSkin: Embed(source="SeamlessSkin.swf", symbol="project-definition_selectedOverSkin");
+	selectedUpSkin: Embed(source="SeamlessSkin.swf", symbol="project-definition_selectedUpSkin");
+	upSkin: Embed(source="SeamlessSkin.swf", symbol="project-definition_upSkin");
+}
+.submenuModeling
+{
+	disabledSkin: Embed(source="SeamlessSkin.swf", symbol="submenu-modeling_disabledSkin");
+	downSkin: Embed(source="SeamlessSkin.swf", symbol="submenu-modeling_downSkin");
+	overSkin: Embed(source="SeamlessSkin.swf", symbol="submenu-modeling_overSkin");
+	selectedDisabledSkin: Embed(source="SeamlessSkin.swf", symbol="submenu-modeling_selectedDisabledSkin");
+	selectedDownSkin: Embed(source="SeamlessSkin.swf", symbol="submenu-modeling_selectedDownSkin");
+	selectedOverSkin: Embed(source="SeamlessSkin.swf", symbol="submenu-modeling_selectedOverSkin");
+	selectedUpSkin: Embed(source="SeamlessSkin.swf", symbol="submenu-modeling_selectedUpSkin");
+	upSkin: Embed(source="SeamlessSkin.swf", symbol="submenu-modeling_upSkin");
+}
+.visuals
+{
+	disabledSkin: Embed(source="SeamlessSkin.swf", symbol="visuals_disabledSkin");
+	downSkin: Embed(source="SeamlessSkin.swf", symbol="visuals_downSkin");
+	overSkin: Embed(source="SeamlessSkin.swf", symbol="visuals_overSkin");
+	selectedDisabledSkin: Embed(source="SeamlessSkin.swf", symbol="visuals_selectedDisabledSkin");
+	selectedDownSkin: Embed(source="SeamlessSkin.swf", symbol="visuals_selectedDownSkin");
+	selectedOverSkin: Embed(source="SeamlessSkin.swf", symbol="visuals_selectedOverSkin");
+	selectedUpSkin: Embed(source="SeamlessSkin.swf", symbol="visuals_selectedUpSkin");
+	upSkin: Embed(source="SeamlessSkin.swf", symbol="visuals_upSkin");
+}

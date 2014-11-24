@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: IndicatorTable.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Canvas 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="100%" height="100%" 
+	xmlns:if="org.seamless_ip.ui.indicators.*" 
+	xmlns:components="org.seamless_ip.ui.common.*">
+
+	<mx:Metadata>
+		[Event(name="change")]
+	</mx:Metadata>
+
+
+    <!--
+	A sortable, searchable table of all the indicators in the database. A check
+	box is included for each indicator to select it for the project.
+    -->
+	<mx:Script>
+		<![CDATA[
+			import org.seamless_ip.services.transferobjects.indi.IIndicator;
+			import org.seamless_ip.services.transferobjects.seamproj.SpatialScale;
+			import org.seamless_ip.services.transferobjects.seamproj.Model;
+			import org.seamless_ip.ui.enums.EnumClassName;
+			import mx.collections.ArrayCollection;
+
+			[Bindable] public var indicatorLibrary:IndicatorLibrary;
+			[Bindable] public var selectableModels:ArrayCollection;			
+			[Bindable] public var editable:Boolean = false;
+
+			[Bindable] private var _indicators:ArrayCollection = new ArrayCollection();
+			[Bindable] private var _spatialExtents:ArrayCollection;
+
+			
+			private const TOOLTIP_MODELS:String =
+				"Filters Indicators from the list according to the model that calculates their values.";
+			private const TOOLTIP_SPATIAL_EXTENT:String =
+				"Indicators can be calculated for various geographical areas such as EU, Member State, NUTS2, Farmtype.";
+			private const TOOLTIP_SPATIAL_RESOLUTION:String =
+				"The finest scale at which model provides the outputs necessary to calculate the indicator value (Member State, NUTS2, Farmtype, and Agro-Environmental Zone).";
+			
+
+			/**
+			 * Initialises the table. Retrieves the enmeration values for the
+			 * domains and spatial scales, and updates the table accordingly.
+			 */
+			public function init():void {
+				_spatialExtents = initSpatialScaleExtents();
+				checkBoxFilterByModel.selected = false;
+				comboboxModel.enabled = false;
+				checkBoxFilterBySpatialExtents.selected = false;
+				comboboxSpatialScale.enabled = false;
+				updateTable();
+			}
+
+			
+			/**
+			 * Returns a list of spatial scale extents limited by the selected
+			 * model and with duplicates removed.
+			 */
+			private function initSpatialScaleExtents():ArrayCollection {
+				var result:ArrayCollection = new ArrayCollection();
+				var scales:ArrayCollection = indicatorLibrary.getEnumValues(EnumClassName.SPATIAL_SCALE);
+				
+				var model:Model = null;
+				var add:Boolean;
+				
+				if ((comboboxModel.enabled) && (comboboxModel.selectedItem != null))
+					model = Model(comboboxModel.selectedItem);
+				
+				for each (var scale:SpatialScale in scales) {
+					add = (model == null);
+					
+					// limit available scales according to selected model
+					if (!add) {
+						for each (var modelScale:SpatialScale in model.spatialScales) {
+							if (scale.id == modelScale.id) {
+								add = true;
+								break;
+							}
+						}	
+					}
+					
+					if (add && !result.contains(scale.extent))
+						result.addItem(scale.extent);
+				}
+					
+				return result;
+			}
+			
+			
+			/**
+			 * Updates list of indicators displayed in the table based on the
+			 * users selection.
+			 */
+			private function updateTable():void {
+				var models:ArrayCollection;
+				var spatialExtentName:String = "";
+				var spatialResolutionName:String = "";
+				var matchingIndicators:ArrayCollection;
+
+				if ((comboboxModel.enabled) && (comboboxModel.selectedItem != null))
+					models = new ArrayCollection([comboboxModel.selectedItem]);
+				else
+					models = selectableModels;
+					
+				if ((comboboxSpatialScale.enabled) && (comboboxSpatialScale.selectedItem != null)) {
+					spatialExtentName = String(comboboxSpatialScale.selectedItem);
+					spatialResolutionName = ""; // not used for selection in this version
+				}
+
+				matchingIndicators = indicatorLibrary.findByModelsAndScale(
+					models,
+					spatialExtentName,
+					spatialResolutionName,
+					true
+				);
+				
+				_indicators.removeAll();
+				for each (var item:IIndicator in matchingIndicators) {
+					_indicators.addItem(item);
+				}				
+			}
+			
+			
+			/**
+			 * Handles a change in model selection by updating the available
+			 * spatial extents accordingly and refreshing the displayed list
+			 * of indicators.
+			 */
+			private function updateModel():void {
+				_spatialExtents = initSpatialScaleExtents();
+				updateTable();
+			}
+			
+			
+			/**
+			 * Changes the selected state of all displayed indicators.
+			 */
+			private function changeSelectedState(selected:Boolean):void {
+				for each (var item:IIndicator in _indicators) {
+					item.setSelected(selected);
+				}
+				dataGridIndicators.invalidateList();
+
+				if (editable)
+					dispatchEvent(new Event("change"));
+			}
+			
+			
+			/**
+			 * Handles change notifications from the cells.
+			 */
+			private function changed(event:Event):void {
+				if (editable)
+					dispatchEvent(new Event("change"));
+			}
+
+
+			/**
+			 * Activates or deactivates the filtering by model.
+			 */
+			private function checkBoxFilterByModelClicked(event:Event = null):void {
+				if (checkBoxFilterByModel.selected) {
+					viewStackFilterByModel.selectedChild = viewModelSelectionOn;
+					comboboxModel.enabled = true;
+				} else {
+					viewStackFilterByModel.selectedChild = viewModelSelectionOff;
+					comboboxModel.enabled = false;
+				}
+				updateModel();				
+			}
+
+
+			/**
+			 * Activates or deactivates the filtering by spatial scale extent.
+			 */
+			private function checkBoxFilterByExtentClicked(event:Event = null):void {
+				if (checkBoxFilterBySpatialExtents.selected) {
+					viewStackFilterByExtent.selectedChild = viewExtentSelectionOn;
+					comboboxSpatialScale.enabled = true;
+				} else {
+					viewStackFilterByExtent.selectedChild = viewExtentSelectionOff;
+					comboboxSpatialScale.enabled = false;
+				}
+				updateTable();				
+			}
+
+
+			/**
+			 * KeyUp handler for the datagrid to allow the spacebar to be used
+			 * to select/deselect indicators.
+			 */
+			private function datagridKeyUpHandler(event:KeyboardEvent):void {
+				// process spacebar in datagrid to toggle selected state of indicator
+				if ((event.currentTarget == dataGridIndicators) && (event.charCode == 0x20)) {
+					var item:Object = DataGrid(event.currentTarget).selectedItem;
+					if (item is IIndicator) {
+						IIndicator(item).setSelected(!IIndicator(item).getSelected());
+						dataGridIndicators.invalidateList();
+						dispatchEvent(new Event("change"));
+					}					
+				}
+			}
+
+
+			/**
+			 * Label function for Model objects.
+			 */			
+	        private function modelLabel(item:Object):String {
+	        	if (item is Model)
+	       			return Model(item).name + " [Version: " + Model(item).version + "]";
+	       		else
+	       			return "Unknown";
+	        }
+			
+		]]>
+	</mx:Script>
+
+	<!-- 
+	===========================================================================
+		Components
+	===========================================================================
+	-->
+
+	<mx:VBox 
+		width="100%" 
+		height="100%"
+		backgroundColor="#FFFFFF"
+		backgroundAlpha="1"
+		verticalGap="3"
+		borderStyle="solid" 
+		cornerRadius="5"
+		>
+
+		<mx:VBox 
+			width="100%" 
+			horizontalAlign="center" verticalAlign="middle" borderStyle="none" cornerRadius="0"
+			paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" horizontalGap="2"
+			backgroundColor="#dcdcd0" backgroundAlpha="0.1"
+			>
+			<mx:Label text="These filters will, when enabled, be applied to the indicators available from the project model chain:" width="100%" enabled="false"/>
+			<mx:HBox width="100%">
+				<mx:CheckBox id="checkBoxFilterByModel" 
+					label="Show only available indicators calculated by the model:" 
+					width="400" textAlign="left"
+					selected="false"
+					click="checkBoxFilterByModelClicked()"
+					toolTip="{TOOLTIP_MODELS}"
+					/>
+				<mx:ViewStack id="viewStackFilterByModel" width="100%" height="100%">
+					<mx:VBox id="viewModelSelectionOff" width="100%" height="100%" verticalAlign="middle" borderStyle="solid" paddingLeft="5">
+						<mx:Label id="labelAllModels" width="100%" text="All" fontWeight="normal" textAlign="left"/>					
+					</mx:VBox>
+					<mx:VBox id="viewModelSelectionOn" width="100%" height="100%">
+						<mx:ComboBox id="comboboxModel"
+							width="100%" height="100%"
+							dataProvider="{selectableModels}"
+							labelFunction="{modelLabel}"
+							change="updateModel()"
+							enabled="false"
+							toolTip="{TOOLTIP_MODELS}"
+							/>
+					</mx:VBox>
+				</mx:ViewStack>
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:CheckBox id="checkBoxFilterBySpatialExtents" 
+					label="Show only available indicators calculated with spatial extent:" 
+					width="400" textAlign="left"
+					selected="false"
+					click="checkBoxFilterByExtentClicked()"
+					toolTip="{TOOLTIP_SPATIAL_EXTENT}"
+					/>
+				<mx:ViewStack id="viewStackFilterByExtent" width="100%" height="100%">
+					<mx:VBox id="viewExtentSelectionOff" width="100%" height="100%" verticalAlign="middle" borderStyle="solid" paddingLeft="5">
+						<mx:Label id="labelAllExtents" width="100%" text="All" fontWeight="normal" textAlign="left"/>					
+					</mx:VBox>
+					<mx:VBox id="viewExtentSelectionOn" width="100%" height="100%">
+						<mx:ComboBox id="comboboxSpatialScale"
+							width="100%" height="100%"
+							dataProvider="{_spatialExtents}"
+							change="updateTable()"
+							enabled="false"
+							toolTip="{TOOLTIP_SPATIAL_EXTENT}"
+							/>
+					</mx:VBox>
+				</mx:ViewStack>
+			</mx:HBox>
+		</mx:VBox>
+
+		<mx:Label text="Available Indicators (matching all enabled filters):" width="100%" enabled="false"/>
+
+		<mx:DataGrid id="dataGridIndicators"
+			dataProvider="{_indicators}"
+			width="100%"
+			height="100%"
+			change="changed(event)"
+			keyUp="datagridKeyUpHandler(event)"
+			toolTip="{data.description}"
+			>
+			<mx:columns>
+				<mx:DataGridColumn headerText="Select" width="60" dataField="selected" sortable="true"
+					itemRenderer="org.seamless_ip.ui.indicators.CheckboxRenderer"
+					editable="{editable}"
+					/>
+				<components:DataGridColumnNested headerText="Name" dataField="label_en" sortable="true"
+					itemRenderer="org.seamless_ip.ui.indicators.ImplementedLabelRenderer"
+					/>
+				<components:DataGridColumnNested headerText="Unit" dataField="unit" sortable="true"
+					itemRenderer="org.seamless_ip.ui.indicators.ImplementedLabelRenderer"
+					/>
+				<components:DataGridColumnNested headerText="Spatial Resolution" dataField="spatialScale.resolution" sortable="false"
+					itemRenderer="org.seamless_ip.ui.indicators.ImplementedLabelRenderer"
+					/>
+				<mx:DataGridColumn headerText="Status" width="30" editable="false"
+					itemRenderer="org.seamless_ip.ui.indicators.EndorsedStateRenderer"
+					/>
+
+				<mx:DataGridColumn headerText="" editable="false" width="30">
+					<mx:itemRenderer>
+						<mx:Component>
+							<mx:VBox width="100%" height="100%" horizontalAlign="center" verticalAlign="middle">
+								<mx:Script>
+									<![CDATA[
+										import org.seamless_ip.services.transferobjects.indi.IIndicator;
+										import mx.core.Application;
+										import mx.managers.PopUpManager;
+										import mx.core.IFlexDisplayObject;
+
+										private function showProperties(data:Object):void
+										{	        
+											if (data is IIndicator)
+											{
+												var dialog:IFlexDisplayObject = PopUpManager.createPopUp(this, IndicatorPropertiesDlg, true);
+												IndicatorPropertiesDlg(dialog).indicator = IIndicator(data);
+									        	dialog.x = (Application.application.width - dialog.width) / 2;
+									        	dialog.y = (Application.application.height - dialog.height) / 3;
+											}
+										}
+									]]>
+								</mx:Script>
+								<mx:Button 
+									styleName="flattenedButton" 
+									width="16" height="16"
+									click="showProperties(data)" 
+									toolTip="Show more properties of the indicator"
+									enabled="true"
+									icon="@Embed('/img/icons/seamless-info-up.gif')"
+									overIcon="@Embed(source='/img/icons/seamless-info-up-selected.gif')"
+									disabledIcon="@Embed(source='/img/icons/seamless-info-disabled.gif')" 
+									/>
+							</mx:VBox>
+						</mx:Component>
+					</mx:itemRenderer>
+				</mx:DataGridColumn>
+				
+			</mx:columns>
+		</mx:DataGrid>
+		<mx:HBox 
+			width="100%" 
+			verticalAlign="middle" 
+			horizontalGap="5"
+			paddingBottom="2"
+			paddingTop="2"
+			paddingLeft="5"
+			paddingRight="5"
+			>
+			<mx:LinkButton id="buttonSelectAll"
+				label="Select all"
+				enabled="{editable}"
+				click="changeSelectedState(true)"
+				/>
+			<mx:LinkButton id="buttonDeselectAll"
+				label="Deselect all"
+				enabled="{editable}"
+				click="changeSelectedState(false)"
+				/>
+			<mx:Label
+				visible="{editable}" 
+				text="(Or use the checkbox in the Select column to choose per indicator.)" 
+				width="100%" 
+				enabled="false"
+				/>
+		</mx:HBox>
+	</mx:VBox>
+</mx:Canvas>

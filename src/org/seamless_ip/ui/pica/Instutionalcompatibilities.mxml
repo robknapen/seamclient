@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: Instutionalcompatibilities.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" creationComplete="{init()}"
+           xmlns:ns="org.seamless_ip.ui.pica.*" xmlns:ns1="org.seamless_ip.ui.common.*">
+    <!--
+    Screen with overview of all Instutionalcompatibilities for a specific project.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.managers.PopUpManager;
+
+        import org.seamless_ip.services.remoting.OpenRequestsEvent;
+        import org.seamless_ip.services.remoting.RequestProgressEvent;
+        import org.seamless_ip.services.transferobjects.pica.InstitutionalCompatibility;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        private var instComp:InstutionalcompatibilityFrm;
+        private var instEval:InstutionalcompatibilityEvaluate;
+
+        [Bindable]
+        public var _project:Project;
+        [Bindable]
+        public var _user:User;
+
+        [Bindable]
+        public var instutionalcompatibilities:ArrayCollection = null;
+        [Bindable]
+        public var cIAS:ArrayCollection = null;
+        [Bindable]
+        public var naturalResourceFocus:ArrayCollection = null;
+        [Bindable]
+        public var pICAIndicatorGeneral:ArrayCollection = null;
+        [Bindable]
+        public var propertyRightsChanges:ArrayCollection = null;
+        [Bindable]
+        public var policyTypes:ArrayCollection = null;
+
+
+        private var lastView:int = 1;
+
+        private function init(): void {
+            // Todo replace with real user and project
+            _user = new User();
+            _user.id = "65";
+
+            _project = new Project();
+            _project.id = "120";
+
+
+            instComp = new InstutionalcompatibilityFrm();
+
+            instComp.addEventListener(PicaEvent.SAVEINSTCOMP, InstCompClosed);
+
+            parent.addEventListener(PicaEvent.CHANGEVIEWINSTS, changeView);
+
+            PicaServiceSingelton.findAllByProjectID(parseInt(_project.id));
+            PicaServiceSingelton.getAllNaturalResourceFocus();
+            PicaServiceSingelton.getAllPICAIndicatorGeneral();
+            PicaServiceSingelton.getAllPropertyRightsChanges();
+            PicaServiceSingelton.getAllPolicyType();
+            PicaServiceSingelton.getAllCIAs();
+
+
+        }
+
+        public function InstCompClosed(event:PicaEvent):void {
+            var found:Boolean = false;
+            for (var i:int = 0; i < instutionalcompatibilities.length; i++) {
+                var inst:InstitutionalCompatibility = instutionalcompatibilities.getItemAt(i) as InstitutionalCompatibility;
+                if (event.institutionalCompatibility.id == inst.id) {
+                    inst = event.institutionalCompatibility;
+                    found = true
+                    break;
+                }
+            }
+            if (!found) {
+                instutionalcompatibilities.addItem(event.institutionalCompatibility);
+            }
+            // Update to just update on later
+            //PicaServiceSingelton.updateInst(event.institutionalCompatibility);
+            PicaServiceSingelton.update(event.institutionalCompatibility);
+        }
+
+        [Bindable]
+        private var _picaService:PicaService;
+
+        public function get PicaServiceSingelton():PicaService
+        {
+            if (_picaService == null) {
+                _picaService = new PicaService(_user);
+                _picaService.addEventListener(RequestProgressEvent.REQUEST_SEND, RequestSend);
+                _picaService.addEventListener(PicaEvent.INSTUTIONALCOMPATIBILITIES, RequestCompleted);
+                _picaService.addEventListener(PicaEvent.CREATEOKMSG, RequestInstCreate);
+                _picaService.addEventListener(RequestProgressEvent.REQUEST_FAILED, RequestFailed);
+                _picaService.addEventListener(OpenRequestsEvent.OPENREQUEST_SEND, RequestsOpen);
+                _picaService.addEventListener(PicaEvent.UPDATEINST, RequestsUpdate);
+
+
+                // Request Metadata
+                _picaService.addEventListener(PicaEvent.CIAS, RequestCIAs);
+                _picaService.addEventListener(PicaEvent.NATURALRESOURCEFOCUS, RequestNaturalResourceFocus);
+                _picaService.addEventListener(PicaEvent.PICAINDICATORGENERAL, RequestPICAIndicatorGeneral);
+                _picaService.addEventListener(PicaEvent.PROPERTYRIGHTSCHANGES, RequestPropertyRightsChanges);
+                _picaService.addEventListener(PicaEvent.POLICYTYPES, RequestGetAllPolicyType);
+
+                _picaService.addEventListener(PicaEvent.GETALLPICASPATIALLEVEL, RequestPICASpatialLevel);
+
+
+            }
+            return _picaService;
+        }
+
+        public function RequestsOpen(event:OpenRequestsEvent):void {
+            if (event.requests == 0) {
+                picaViewStack.selectedIndex = lastView;
+            } else {
+                progressscreen.progressBarText = event.requests + " tasks left";
+                progressscreen.invalidateDisplayList();
+                picaViewStack.selectedIndex = 0;
+            }
+        }
+
+        public function RequestFailed(event:RequestProgressEvent):void {
+            Alert.show(event.message);
+        }
+
+
+        public function RequestSend(event:RequestProgressEvent):void {
+            progressscreen.progressText.text = (event.message);
+
+        }
+
+        public function RequestCompleted(event:PicaEvent):void {
+            instutionalcompatibilities = _picaService.instutionalcompatibilities;
+        }
+
+        public function RequestNaturalResourceFocus(event:PicaEvent):void {
+            naturalResourceFocus = _picaService.naturalResourceFocus;
+            instComp.naturalResourceFocus = naturalResourceFocus;
+        }
+
+        public function RequestPICAIndicatorGeneral(event:PicaEvent):void {
+            pICAIndicatorGeneral = _picaService.pICAIndicatorGeneral;
+            instutionalcompatibilityEvaluate.pICAIndicatorGeneral = pICAIndicatorGeneral;
+
+        }
+
+        public function RequestCIAs(event:PicaEvent):void {
+            cIAS = _picaService.cIAS;
+            instutionalcompatibilityEvaluate.cIAS = cIAS;
+        }
+
+        public function RequestPropertyRightsChanges(event:PicaEvent):void {
+            propertyRightsChanges = _picaService.propertyRightsChanges;
+            instComp.propertyRightsChanges = propertyRightsChanges;
+        }
+
+        public function RequestGetAllPolicyType(event:PicaEvent):void {
+            policyTypes = _picaService.policyTypes;
+            instComp.policyTypes = policyTypes;
+        }
+
+        public function RequestsUpdate(event:PicaEvent):void {
+            for (var i:int = 0; i < instutionalcompatibilities.length; i++) {
+                var inst:InstitutionalCompatibility = instutionalcompatibilities.getItemAt(i) as InstitutionalCompatibility;
+                if (PicaServiceSingelton.updatedInst.id == inst.id) {
+                    inst = PicaServiceSingelton.updatedInst;
+                    break;
+                }
+            }
+
+            lastView = 1;
+            picaViewStack.selectedIndex = lastView;
+
+        }
+
+
+        public function RequestInstCreate(event:PicaEvent):void {
+            instComp.instCompatibility = _picaService.newInst;
+            instComp.isEditing = false;
+            PopUpManager.addPopUp(instComp, this, true);
+            PopUpManager.centerPopUp(instComp);
+
+        }
+
+
+        private function changeView(event:PicaEvent) : void {
+            lastView = 2;
+            picaViewStack.selectedIndex = lastView;
+            PicaServiceSingelton.update(event.institutionalCompatibility);
+
+            /* lastView = 1;
+             picaViewStack.selectedIndex = lastView; */
+        }
+
+        private function popInstitutionalComp(evt:MouseEvent):void {
+            // --> RequestInstCreate
+            _picaService.create(parseInt(_project.id));
+        }
+
+        private function popEval(event:MouseEvent):void {
+            instEval = new InstutionalcompatibilityEvaluate();
+            instEval.width = this.width * 0.8;
+            instEval.height = this.height * 0.8;
+            instEval.user = _user;
+            instEval.picaService = _picaService;
+
+
+            PopUpManager.addPopUp(instEval, this, true);
+            PopUpManager.centerPopUp(instEval);
+        }
+
+        public function onEdit(avEvent :Event, avData  :Object):void
+        {
+            for (var i:int; i < instutionalcompatibilities.length; i++) {
+                if (avData == instutionalcompatibilities.getItemAt(i)) {
+
+                    instComp.isEditing = true;
+                    PopUpManager.addPopUp(instComp, this, true);
+                    PopUpManager.centerPopUp(instComp);
+                    instComp.instCompatibility = (InstitutionalCompatibility)(avData);
+                    break;
+                }
+            }
+        }
+
+
+        public function onOpen
+                (avEvent :Event,
+                 avData  :Object)
+                :void
+        {
+            PicaServiceSingelton.getAllPICASpatialLevel((InstitutionalCompatibility)(avData).id)
+            /* 	for (var i:int;i < instutionalcompatibilities.length; i++) {
+             if (avData == instutionalcompatibilities.getItemAt(i)) { */
+            lastView = 2;
+            picaViewStack.selectedIndex = lastView;
+            instutionalcompatibilityEvaluate.institutionalCompatibility = (InstitutionalCompatibility)(avData);
+            // picaViewStack.selectedIndex = 2
+            /* 		break;
+             }
+             } */
+        }
+
+        public function RequestPICASpatialLevel(event:PicaEvent):void {
+
+            /* 		 	instutionalcompatibilityEvaluate.pICASpatialLevel = _picaService.pICASpatialLevel;
+             */
+        }
+
+
+        public function onDelete
+                (avEvent :Event,
+                 avData  :Object)
+                :void
+        {
+            for (var i:int; i < instutionalcompatibilities.length; i++) {
+                if (avData == instutionalcompatibilities.getItemAt(i)) {
+
+                    _picaService.remove(parseFloat((avData as InstitutionalCompatibility).id));
+                    instutionalcompatibilities.removeItemAt(i);
+                    break;
+                }
+            }
+        }
+
+        public function onResult(avEvent :Event, avData  :Object):void
+        {
+            Alert.show("Implement me");
+        }
+		
+				 
+		]]>
+	</mx:Script>
+    <mx:ViewStack id="picaViewStack" height="100%" width="100%">
+        <ns1:ServerProgressView id="progressscreen"/>
+
+        <mx:Panel height="100%" width="100%" layout="vertical">
+            <mx:FormHeading label="Institutional compatibilities"/>
+            <mx:DataGrid id="dgInstComp" height="100%" width="100%"
+                         dataProvider="{instutionalcompatibilities}"
+                         wordWrap="true">
+                <mx:columns>
+                    <mx:DataGridColumn headerText="Name" dataField="name"/>
+                    <mx:DataGridColumn headerText="Description" dataField="description"/>
+                    <mx:DataGridColumn headerText="Date" dataField="date" width="80"/>
+                    <mx:DataGridColumn editable="false" width="60">
+                        <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:HBox>
+                                    <mx:Button label="Edit" click="outerDocument.onEdit( event, data )"/>
+                                </mx:HBox>
+                            </mx:Component>
+                        </mx:itemRenderer>
+                    </mx:DataGridColumn>
+                    <mx:DataGridColumn editable="false" width="70">
+                        <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:HBox>
+                                    <mx:Button label="Open" click="outerDocument.onOpen( event, data )"/>
+                                </mx:HBox>
+                            </mx:Component>
+                        </mx:itemRenderer>
+                    </mx:DataGridColumn>
+                    <mx:DataGridColumn editable="false" width="80">
+                        <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:HBox>
+                                    <mx:Button label="Result" click="outerDocument.onResult( event, data )"/>
+                                </mx:HBox>
+                            </mx:Component>
+                        </mx:itemRenderer>
+                    </mx:DataGridColumn>
+                    <mx:DataGridColumn editable="false" width="80">
+                        <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:HBox>
+                                    <mx:Button label="Delete" click="outerDocument.onDelete( event, data )"/>
+                                </mx:HBox>
+                            </mx:Component>
+                        </mx:itemRenderer>
+                    </mx:DataGridColumn>
+                </mx:columns>
+            </mx:DataGrid>
+            <mx:HBox width="100%" horizontalAlign="right" verticalAlign="bottom">
+                <!--	<mx:Button label="Debug...."
+                toolTip=""
+                click="{picaViewStack.selectedIndex = 2}"
+                disabledIcon="@Embed('/img/icons/add_obj.gif')"
+                icon="@Embed('/img/icons/add_obj.gif')"/>-->
+                <mx:Button label="Add new"
+                           toolTip=""
+                           click="{popInstitutionalComp(event)}"
+                           disabledIcon="@Embed('/img/icons/add_obj.gif')"
+                           icon="@Embed('/img/icons/add_obj.gif')"/>
+            </mx:HBox>
+        </mx:Panel>
+        <ns:InstutionalcompatibilityEvaluate id="instutionalcompatibilityEvaluate" picaService="{_picaService}"/>
+    </mx:ViewStack>
+</mx:Canvas>

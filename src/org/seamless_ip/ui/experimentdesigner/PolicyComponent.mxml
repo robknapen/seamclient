@@ -1,0 +1,1516 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: PolicyComponent.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+           width="100%" height="100%"
+           creationComplete="{init()}"
+           xmlns:ExperimentManager="views.modelling.ExperimentManager.*" xmlns:ns="org.seamless_ip.ui.common.*"
+           xmlns:ns1="org.seamless_ip.ui.experimentdesigner.*">
+
+    <mx:Script>
+	<![CDATA[
+		import mx.collections.ArrayCollection;
+        import mx.events.ListEvent;
+        import mx.rpc.events.ResultEvent;
+
+        import org.seamless_ip.services.remoting.RequestProgressEvent;
+        import org.seamless_ip.services.transferobjects.capri.BasicPremium;
+        import org.seamless_ip.services.transferobjects.capri.BilateralTariff;
+        import org.seamless_ip.services.transferobjects.capri.CouplingDegree;
+        import org.seamless_ip.services.transferobjects.capri.GlobalTariff;
+        import org.seamless_ip.services.transferobjects.capri.SetAsideRegulation;
+        import org.seamless_ip.services.transferobjects.capri.SubsidisedExport;
+        import org.seamless_ip.services.transferobjects.capri.TradeReformProposal;
+        import org.seamless_ip.services.transferobjects.farmopt.FarmQuota;
+        import org.seamless_ip.services.transferobjects.farmopt.Penalty;
+        import org.seamless_ip.services.transferobjects.farmopt.Price;
+        import org.seamless_ip.services.transferobjects.farmopt.YieldTrend;
+        import org.seamless_ip.services.transferobjects.seamproj.PolicyOption;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        /* import mx.automation.codec.TabObjectCodec; */
+
+        [Bindable]
+        public var myPolicyOption:PolicyOption
+
+        [Bindable]
+        public var mySubsidesExport:ArrayCollection;
+        [Bindable]
+        public var myCouplingDegree:ArrayCollection;
+        [Bindable]
+        public var mySetaside:ArrayCollection;
+        [Bindable]
+        public var myGlobalTrade:ArrayCollection;
+        [Bindable]
+        public var myBilateralTrad:ArrayCollection;
+        [Bindable]
+        public var myTradeReformProposal:ArrayCollection;
+        [Bindable]
+        public var myPriceChange:ArrayCollection;
+        [Bindable]
+        public var myQuota:ArrayCollection;
+        [Bindable]
+        public var myBasicPremiums:ArrayCollection;
+        [Bindable]
+        public var myPolicyMeasures:ArrayCollection;
+        [Bindable]
+        public var theTradeReformProposal:TradeReformProposal;
+        [Bindable]
+        public var myTradeReformProposalCuts:ArrayCollection;
+        [Bindable]
+        public var myTradereformactivated:Boolean;
+
+
+        private var _modelChainName:String = "FSSSIMCAPRI";
+
+        private var _experimentID:Number = NaN;
+
+        [Bindable]
+        private var _policyService:PolicyService;
+
+        public function get PolicyServiceSingelton():PolicyService
+        {
+            if (_policyService == null) {
+                _policyService = new PolicyService();
+                _policyService.addEventListener(RequestProgressEvent.REQUEST_SEND, RequestSend);
+                _policyService.addEventListener(RequestProgressEvent.REQUEST_COMPLETED, RequestCompleted);
+            }
+            return _policyService;
+        }
+
+        [Bindable]
+        private var _project:Project;
+
+        public function set project(project:Project):void
+        {
+            _project = project;
+        }
+
+        [Bindable]
+        private var _user:User = new User();
+
+        public function set user(user:User):void {
+            _user = user;
+        }
+
+        [Bindable]
+        private var _showCtrl:Boolean = false;
+
+        public function set showCtrl(showCtrl:Boolean) : void
+        {
+            _showCtrl = showCtrl;
+        }
+
+        [Bindable]
+        private var _isEnable:Boolean = false;
+
+        private function isEnable():void {
+            _isEnable = _user.canDoForProject(_project.id, "UPDATE", "EXPERIMENT");
+        }
+
+        public function editable():void {
+            dgBasicPremium.editable = _isEnable;
+            dgBilateralTrad.editable = _isEnable;
+            dgCommansAndControl.editable = _isEnable;
+            dgCouplingDegree.editable = _isEnable;
+            dgGlobalTrade.editable = _isEnable;
+            dgPriceChanges.editable = _isEnable;
+            dgQuota.editable = _isEnable;
+            dgSetaside.editable = _isEnable;
+            dgSubsidesExport.editable = _isEnable;
+            dgTradeReformProposal.editable = _isEnable;
+            // dgTRPCountry.editable = _isEnable;
+
+            // ucPolicyMeasure.enabled = _isEnable;
+        }
+
+        public function RequestSend(event:RequestProgressEvent):void {
+
+            // do something with
+            // event.message
+        }
+
+        public function RequestCompleted(event:RequestProgressEvent):void {
+            // do something with
+            if (isUpdateing) {
+                dispatchEvent(new ExperimentDesignerEvent(ExperimentDesignerEvent.EXPERIMENT_CONTEXT_SAVE_READY));
+                isUpdateing = false;
+            } else {
+                dispatchEvent(new ExperimentDesignerEvent(ExperimentDesignerEvent.EXPERIMENT_POLICY_LOAD_READY));
+            }
+            for each (var policy:PolicyOption in PolicyServiceSingelton.policyOptions) {
+                policyOption = policy;
+            }
+
+            fillTable();
+        }
+
+        public function set experimentID(experimentID:Number):void {
+            _experimentID = experimentID;
+        }
+
+
+        public function set modelChain(name:String):void {
+            _modelChainName = name;
+            enableTabs();
+        }
+
+
+        private function enableTabs():void {
+            tabBasicPremium.enabled = false;
+            tabBilateralTrade.enabled = false;
+            tabControlMeasure.enabled = false;
+            tabCouplingDegree.enabled = false;
+            tabExportSub.enabled = false;
+            tabFarmQuota.enabled = false;
+            tabPriceChanged.enabled = false;
+            tabSetASide.enabled = false;
+            tabGlobalTrade.enabled = false;
+            tabTradeReformProposal.enabled = false;
+
+
+            // Enable FSSIM screens
+            if (_modelChainName.toUpperCase().search("FSSIM") != -1) {
+                tabBasicPremium.enabled = true;
+                tabControlMeasure.enabled = true;
+
+                tabCouplingDegree.enabled = true;
+                tabFarmQuota.enabled = true;
+                tabPriceChanged.enabled = true;
+                tabSetASide.enabled = true;
+
+
+            }
+
+            // Enable CAPRI screens
+            if (_modelChainName.toUpperCase().search("CAPRI") != -1) {
+                tabBilateralTrade.enabled = true;
+                tabCouplingDegree.enabled = true;
+                tabExportSub.enabled = true;
+                tabSetASide.enabled = true;
+                tabGlobalTrade.enabled = true;
+                tabTradeReformProposal.enabled = true;
+            }
+
+        }
+
+
+        public function get policyOption(): PolicyOption
+        {
+            return myPolicyOption;
+        }
+
+        public function set policyOption(policyOption: PolicyOption):void {
+            myPolicyOption = policyOption
+        }
+
+
+        public function getPolicyOption():void
+        {
+            isEnable();
+            editable();
+            PolicyServiceSingelton.findById(_experimentID);
+        }
+
+        private var isUpdateing:Boolean = false;
+
+        public function updatePolicyOption():void
+        {
+            isUpdateing = true;
+            policyOption.tradeReformActivated = chkRuleBasedTP.selected;
+            PolicyServiceSingelton.updatePolicyOption(policyOption);
+            /* setupCall("updatePolicyOption", editPolicyOption_callback);
+             _ro.updatePolicyOption(policyOption); */
+        }
+
+
+        public function fillTable():void
+        {
+
+            myBilateralTrad = policyOption.bilateralTariffs;
+            myCouplingDegree = policyOption.couplingDegrees;
+            myGlobalTrade = policyOption.globalTariffs;
+            mySetaside = policyOption.setAsideRegulations;
+            mySubsidesExport = policyOption.subsidisedExports;
+            myTradeReformProposal = policyOption.tradeReformProposals;
+            myTradereformactivated = policyOption.tradeReformActivated;
+            myPriceChange = policyOption.priceChange;
+            myBasicPremiums = policyOption.basicPremiums;
+            myPriceChange = policyOption.priceChange;
+            myQuota = policyOption.farmQuotas;
+            myPolicyMeasures = policyOption.policyMeasures;
+
+            dispatchEvent(new ExperimentDesignerEvent(ExperimentDesignerEvent.EXPERIMENT_POLICY_LOAD_READY));
+        }
+
+        public function editPolicyOption_callback(event:ResultEvent):void
+        {
+            policyOption = event.result as PolicyOption;
+            dispatchEvent(new ExperimentDesignerEvent(ExperimentDesignerEvent.EXPERIMENT_POLICY_SAVE_READY));
+        }
+
+        [Bindable]
+        public var ruleBaseTP:Boolean;
+
+
+        /* 	private function baslineValueMinSA(item:Object, column:DataGridColumn):String
+         {
+         return nf2.format((SetAsideRegulation)(item).BaseLineValueMin);
+         }  */
+        /* private function baslineValueMaxSA(item:Object, column:DataGridColumn):String
+         {
+         return nf2.format((SetAsideRegulation)(item).BaseLineValueMax);
+         } */
+
+        private function baslineValue(item:Object, column:DataGridColumn):String
+        {
+            return "NA";
+        }
+
+
+        /* 	private function baslineValueAdvaloremGT(item:Object, column:DataGridColumn):String {
+         return nf2.format((GlobalTariff)(item).baslineAdvalorem);
+         } */
+        /* private function baslineValueSpecifictariffGT(item:Object, column:DataGridColumn):String {
+         return nf2.format((GlobalTariff)(item).baslineSpecifictariff);
+         } */
+
+        /* private function baslineValueAdvaloremBT(item:Object, column:DataGridColumn):String {
+         return nf2.format((BilateralTariff)(item).baslineAdvalorem);
+         } */
+        /* private function baslineValueSpecifictariffBT(item:Object, column:DataGridColumn):String {
+         return nf2.format((BilateralTariff)(item).baslineSpecifictariff);
+         } */
+        /* private function baslineValueTRQBT(item:Object, column:DataGridColumn):String {
+         return (BilateralTariff)(item).baslineTariffratequota;
+         }
+         */
+
+
+        private function init():void
+        {
+            enableTabs();
+        }
+
+        private function diff(n1:Number, n2:Number) : Number {
+
+            if (n1 < n2) {
+                return n2 - n1;
+            } else {
+                return n1 - n2;
+            }
+        }
+
+        private function diffColor(n1:Number, n2:Number, color:uint): uint {
+
+            if (diff(n1, n2) >= 0.01) {
+                return  0xADFF2F
+            } else {
+                return color;
+            }
+        }
+
+
+        private function rowColorSA(item:Object, color:uint):uint
+        {
+            if (
+                    diff(((SetAsideRegulation)(item)).valueMin, ((SetAsideRegulation)(item)).baselineValueMin) >= 0.01
+                            || diff(((SetAsideRegulation)(item)).valueMax, ((SetAsideRegulation)(item)).baselineValueMax) >= 0.01) {
+                return  0xADFF2F;
+            }
+            return color;
+        }
+
+
+        private function rowColorGT(item:Object, color:uint):uint
+        {
+            if (
+                    diff(((GlobalTariff)(item)).adValorem, ((GlobalTariff)(item)).baslineAdvalorem) >= 0.01
+                            || diff(((GlobalTariff)(item)).specificTariff, ((GlobalTariff)(item)).baslineSpecifictariff) >= 0.01) {
+                return  0xADFF2F;
+            }
+            return color;
+        }
+
+        private function rowColorBT(item:Object, color:uint):uint
+        {
+            if (
+                    diff(((BilateralTariff)(item)).adValorem, ((BilateralTariff)(item)).baslineAdvalorem) >= 0.01
+                            || diff(((BilateralTariff)(item)).specificTariff, ((BilateralTariff)(item)).baslineSpecifictariff) >= 0.01
+                            || diff(((BilateralTariff)(item)).tariffRateQuota, ((BilateralTariff)(item)).baslineTariffratequota) >= 0.01)
+            {
+                return  0xADFF2F;
+            }
+
+            return color;
+        }
+
+        private function quotaColor(item:Object, color:uint):uint
+        {
+            if (diff(((FarmQuota)(item)).additionalPrice, ((FarmQuota)(item)).baselineAdditionalPrice) >= 0.01
+                    || diff(((FarmQuota)(item)).quotaAmount, ((FarmQuota)(item)).baselineQuotaAmount) >= 0.01) {
+                return  0xADFF2F;
+            }
+            return color;
+        }
+
+        private function resetBasicPremium2Baseline():void {
+            try {
+                for each (var basicPremiums:BasicPremium in policyOption.basicPremiums) {
+                    basicPremiums.value = basicPremiums.baseyearPriceChange;
+                }
+            } catch (Er:Error) {
+            }
+        }
+
+        private function resetBilateralTariff2Baseline():void {
+            try {
+                for each (var bilateralTariffs:BilateralTariff in policyOption.bilateralTariffs) {
+                    bilateralTariffs.adValorem = bilateralTariffs.baslineAdvalorem;
+                    bilateralTariffs.specificTariff = bilateralTariffs.baslineSpecifictariff;
+                    bilateralTariffs.tariffRateQuota = bilateralTariffs.baslineTariffratequota;
+                }
+            } catch (Er:Error) {
+            }
+        }
+
+        private function resetCouplingDegrees2Baseline():void {
+            try {
+                for each (var couplingDegrees:CouplingDegree in policyOption.couplingDegrees) {
+                    couplingDegrees.value = couplingDegrees.baselineValue;
+                }
+            } catch (Er:Error) {
+            }
+        }
+
+        private function resetFarmQuotas2Baseline():void {
+            try {
+                for each (var farmQuotas:FarmQuota in policyOption.farmQuotas) {
+                    farmQuotas.additionalPrice = farmQuotas.baselineAdditionalPrice;
+                    farmQuotas.quotaAmount = farmQuotas.baselineQuotaAmount;
+                    //TODO: fixme!!!
+                    //farmQuotas.quotaLevel = farmQuotas.baselineQuotaLevel;
+                }
+            } catch (Er:Error) {
+            }
+        }
+
+        private function resetGlobalTariff2Baseline():void {
+            try {
+                for each (var globalTariffs:GlobalTariff in policyOption.globalTariffs) {
+                    globalTariffs.adValorem = globalTariffs.baslineAdvalorem;
+                    globalTariffs.specificTariff = globalTariffs.baslineSpecifictariff;
+                }
+            } catch (Er:Error) {
+            }
+        }
+
+        private function resetPriceChange2Baseline():void {
+            try {
+                for each (var priceChange:Price in policyOption.priceChange) {
+
+                    priceChange.value = priceChange.baselineValue;
+
+                }
+            } catch (Er:Error) {
+            }
+        }
+
+        private function resetSetAsideRegulation2Baseline():void {
+            try {
+                for each (var setAsideRegulations:SetAsideRegulation in policyOption.setAsideRegulations) {
+                    setAsideRegulations.valueMin = setAsideRegulations.baselineValueMin;
+                    setAsideRegulations.valueMax = setAsideRegulations.baselineValueMax;
+                }
+            } catch (Er:Error) {
+            }
+        }
+
+        private function resetSubsidisedExport2Baseline():void {
+            try {
+                for each (var subsidies:SubsidisedExport in policyOption.subsidisedExports) {
+                    subsidies.value = subsidies.baselineValue;
+
+                }
+            } catch (Er:Error) {
+            }
+        }
+
+        private function resetYieldTrend2Baseline():void {
+            try {
+                for each (var yieldTrend:YieldTrend in policyOption.yieldTrend) {
+                    yieldTrend.yield = yieldTrend.baselineValue;
+
+                }
+            } catch (Er:Error) {
+            }
+        }
+	]]>
+</mx:Script>
+    <mx:Script source="GridFunctions.as"/>
+    <mx:NumberFormatter precision="2" id="nf2"/>
+    <mx:Panel layout="vertical" height="100%" width="100%"
+              creationComplete="{init()}"
+              id="capriPolicy"
+            >
+        <mx:TabBar id="toolBarBJPolicy"
+                   dataProvider="view" width="100%"/>
+        <mx:ViewStack id="view" width="100%" height="100%" creationPolicy="all">
+            <!-- Market level policies  -->
+            <mx:Panel layout="vertical" width="100%" height="100%"
+                      label="Market level policies"
+                      borderStyle="none">
+                <mx:TabBar id="toolBarBJPolicyML"
+                           dataProvider="viewML"
+                           width="100%" enabled="true"/>
+                <mx:ViewStack id="viewML" width="100%" height="100%">
+
+                    <!-- Export subsidies  -->
+                    <mx:Script>
+						<![CDATA[
+							import mx.utils.ObjectUtil;
+
+                        private function rowColorES(item:Object, color:uint):uint
+                        {
+                            var theV:Number = ((SubsidisedExport)(item)).value;
+                            var theB:Number = (((SubsidisedExport)(item)).BaseLineValue);
+                            if (theV > theB * 2) {
+                                return 0xFF0000;
+                            }
+
+                            return diffColor(theV, theB, color);
+                        }
+
+                        private function se_getCountryAggregate(item:Object, column:DataGridColumn):String
+                        {
+                            return (SubsidisedExport)(item).countryAggregate.name;
+                        }
+
+                        private function sortSubsidisedExportCountryAggregate(obj1:SubsidisedExport, obj2:SubsidisedExport):int {
+                            return ObjectUtil.stringCompare(obj1.countryAggregate.name + obj1.productGroup.label_en, obj2.countryAggregate.name + obj2.productGroup.label_en);
+                        }
+
+                        private function se_getProduct(item:Object, column:DataGridColumn):String
+                        {
+                            return (SubsidisedExport)(item).productGroup.label_en;
+                        }
+
+                        private function sortSubsidisedExportProductGroup(obj1:SubsidisedExport, obj2:SubsidisedExport):int {
+                            return ObjectUtil.stringCompare(obj1.productGroup.label_en + obj1.countryAggregate.name, obj2.productGroup.label_en + obj2.countryAggregate.name);
+                        }
+						
+						]]>
+						</mx:Script>
+                    <mx:Canvas width="100%" height="100%"
+                               id="tabExportSub"
+                               label="Export subsidies"
+                               toolTip="The EU pays export subsidies up to a certain value for single agricultural products. This value can be changed here.">
+                        <mx:Label text="Budged available for subsidised exports"/>
+                        <ns:DataGridRowColor width="100%" height="100%"
+                                             id="dgSubsidesExport"
+                                             dataProvider="{mySubsidesExport}"
+                                             editable="true"
+                                             itemEditEnd="{validatGridInput(event,0,Number.MAX_VALUE,dgSubsidesExport);}"
+                                             rowColorFunction="rowColorES" borderStyle="none">
+                            <ns:columns>
+                                <mx:DataGridColumn headerText="Country aggregate"
+                                                   labelFunction="{se_getCountryAggregate}"
+                                                   editable="false"
+                                        />
+                                <mx:DataGridColumn headerText="Product"
+                                                   labelFunction="se_getProduct"
+                                                   editable="false"
+                                                   sortCompareFunction="sortSubsidisedExportProductGroup"
+                                        />
+                                <ns:FormattedDataGridColomn percision="2" headerText="Value (Mn€)"
+                                                            editable="true"
+                                                            textAlign="right"
+                                                            fontWeight="bold"
+                                                            dataField="value"/>
+                                <ns:FormattedDataGridColomn percision="2" headerText="Baseline Value (Mn€)"
+                                                            editable="false"
+                                                            dataField="BaseLineValue"
+                                                            textAlign="right"/>
+                            </ns:columns>
+                        </ns:DataGridRowColor>
+                    </mx:Canvas>
+                </mx:ViewStack>
+                <mx:HBox width="100%" horizontalAlign="right">
+                    <mx:Button label="Reset to baseline"
+                               click="{resetSubsidisedExport2Baseline()}"
+                               enabled="{_isEnable}"
+                               visible="{_showCtrl}"
+                               includeInLayout="{_showCtrl}"/>
+                </mx:HBox>
+            </mx:Panel>
+
+            <!-- Regional level policies  -->
+            <mx:Panel layout="vertical" width="100%" height="100%" label="Regional level policies">
+                <mx:TabBar id="toolBarBJPolicyRL"
+                           dataProvider="viewRL"
+                           width="100%"
+                           enabled="true"/>
+                <mx:ViewStack id="viewRL" width="100%" height="100%">
+
+                    <!-- Output price -->
+                    <mx:Canvas id="tabPriceChanged"
+                               width="100%" height="100%"
+                               label="Output price"
+                               toolTip="">
+                        <mx:Panel layout="vertical" height="100%" width="100%">
+                            <mx:Script>
+					<![CDATA[		
+						private function pc_region(item:Object, column:DataGridColumn):String {
+                                    return (Price)(item).region.name;
+                                }
+
+                                private function sortPriceChangeRegion(obj1:Price, obj2:Price):int {
+                                    return ObjectUtil.stringCompare(obj1.region.name + obj1.region.ofCountry.name + obj1.product.label_en, obj2.region.name + obj2.region.ofCountry.name + obj2.product.label_en);
+                                }
+
+                                private function pc_country(item:Object, column:DataGridColumn):String {
+                                    return (Price)(item).region.ofCountry.name;
+                                }
+
+                                private function sortPriceChangeCountry(obj1:Price, obj2:Price):int {
+                                    return ObjectUtil.stringCompare(obj1.region.ofCountry.name + obj1.region.name + obj1.product.label_en, obj2.region.ofCountry.name + obj2.region.name + obj2.product.label_en);
+                                }
+
+                                private function pc_cropAnimal(item:Object, column:DataGridColumn):String {
+                                    try {
+                                        return (Price)(item).product.label_en;
+                                    } catch (e:Error) {
+                                    }
+                                    return "N/A";
+                                }
+
+                                private function sortPriceProduct(obj1:Price, obj2:Price):int {
+                                    return ObjectUtil.stringCompare(obj1.product.label_en + obj1.region.name + obj1.region.ofCountry.name, obj2.product.label_en + obj2.region.name + obj2.region.ofCountry.name);
+                                }
+
+                                private function priceColor(item:Object, color:uint):uint
+                                {
+                                    if (diff(((Price)(item)).value, ((Price)(item)).baselineValue) >= 0.01) {
+                                        return  0xADFF2F;
+                                    }
+                                    return color;
+                                }
+						]]>
+						</mx:Script>
+
+                            <ns:DataGridRowColor id="dgPriceChanges"
+                                                 width="100%"
+                                                 height="100%"
+                                                 dataProvider="{myPriceChange}"
+                                                 editable="true"
+                                                 itemEditEnd="{validatGridInput(event,0,Number.MAX_VALUE ,dgPriceChanges);}"
+                                                 rowColorFunction="priceColor"
+                                    >
+                                <ns:columns>
+                                    <!-- Nuts region label_eng/name -->
+                                    <mx:DataGridColumn headerText="Region"
+                                                       editable="false"
+                                                       labelFunction="pc_country"
+                                                       sortCompareFunction="sortPriceChangeCountry"
+                                                       sortDescending="true"
+                                            />
+
+                                    <mx:DataGridColumn headerText="Region"
+                                                       editable="false"
+                                                       labelFunction="pc_region"
+                                                       sortCompareFunction="sortPriceChangeRegion"
+                                                       sortDescending="true"/>
+                                    <!-- Product.label_eng -->
+                                    <mx:DataGridColumn headerText="Crop/animal product"
+                                                       editable="false"
+                                                       sortCompareFunction="sortPriceProduct"
+                                                       labelFunction="pc_cropAnimal"
+                                                       sortDescending="true"/>
+                                    <ns:FormattedDataGridColomn percision="2"
+                                                                headerText="Value (€/t)"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"
+                                                                dataField="value"/>
+                                    <ns:FormattedDataGridColomn percision="2"
+                                                                headerText="Baseyear value (€/t)"
+                                                                editable="false"
+                                                                textAlign="right"
+                                                                dataField="baselineValue"/>
+                                </ns:columns>
+                            </ns:DataGridRowColor>
+                            <mx:HBox width="100%" horizontalAlign="right">
+                                <mx:Button label="Reset to base year"
+                                           click="{resetPriceChange2Baseline()}"
+                                           enabled="{_isEnable}"
+                                           visible="{_showCtrl}"
+                                           includeInLayout="{_showCtrl}"/>
+                            </mx:HBox>
+                        </mx:Panel>
+                    </mx:Canvas>
+
+
+                    <!-- Basic premium  -->
+                    <mx:Canvas id="tabBasicPremium"
+                               width="100%"
+                               height="100%"
+                               label="Basic premium"
+                               toolTip="Tooltip missing">
+                        <mx:Panel layout="vertical" height="100%" width="100%">
+                            <mx:Script>
+							<![CDATA[
+							private function bpPremiumGroupLabel(item:Object, column:DataGridColumn):String {
+                                    try {
+                                        return (BasicPremium)(item).premiumGroup.label_en;
+                                    } catch (e:Error) {
+                                    }
+                                    return "N/A";
+                                }
+
+                                private function sortBasicPremiumPremiumGroup(obj1:BasicPremium, obj2:BasicPremium):int {
+                                    return ObjectUtil.stringCompare(obj1.premiumGroup.label_en, obj2.premiumGroup.label_en);
+                                }
+
+                                private function basicPremiumColor(item:Object, color:uint):uint
+                                {
+                                    if (diff(((BasicPremium)(item)).value, ((BasicPremium)(item)).baseyearPriceChange) >= 0.01) {
+                                        return  0xADFF2F;
+                                    }
+                                    return color;
+                                }
+			
+							]]>
+							</mx:Script>
+                            <ns:DataGridRowColor id="dgBasicPremium"
+                                                 width="100%"
+                                                 height="100%"
+                                                 dataProvider="{myBasicPremiums}"
+                                                 editable="true"
+                                                 rowColorFunction="basicPremiumColor"
+                                                 itemEditEnd="{validatGridInput(event,0,Number.MAX_VALUE,dgBasicPremium);}"
+                                    >
+                                <ns:columns>
+                                    <!-- premium.label_eng -->
+                                    <mx:DataGridColumn headerText="Premium group"
+                                                       editable="false"
+                                                       sortDescending="true"
+                                                       labelFunction="bpPremiumGroupLabel"
+                                                       sortCompareFunction="sortBasicPremiumPremiumGroup"
+                                            />
+
+                                    <ns:FormattedDataGridColomn percision="2"
+                                                                headerText="Value"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"
+                                                                dataField="value"/>
+                                    <ns:FormattedDataGridColomn percision="2"
+                                                                headerText="Baseline value"
+                                                                editable="false"
+                                                                textAlign="right"
+                                                                dataField="baseyearPriceChange"/>
+                                    <!-- basicPremium.applicationType (This is the unit) -->
+                                    <mx:DataGridColumn headerText="Unit"
+                                                       editable="false"
+                                                       width="20"
+                                                       dataField="applicationType"
+                                                       sortDescending="true"/>
+                                </ns:columns>
+                            </ns:DataGridRowColor>
+                            <mx:HBox width="100%" horizontalAlign="right">
+                                <mx:Button label="Reset to baseline"
+                                           click="{resetBasicPremium2Baseline()}"
+                                           enabled="{_isEnable}"
+                                           visible="{_showCtrl}"
+                                           includeInLayout="{_showCtrl}"/>
+                            </mx:HBox>
+                        </mx:Panel>
+                    </mx:Canvas>
+
+
+                    <!-- Quota  -->
+                    <mx:Canvas id="tabFarmQuota"
+                               width="100%"
+                               height="100%"
+                               label="Quota"
+                               toolTip="Tooltip missing">
+                        <mx:Panel layout="vertical" height="100%" width="100%">
+                            <mx:Script>
+							<![CDATA[
+							private function quotaProduct(item:Object, column:DataGridColumn):String {
+                                    try {
+                                        return (FarmQuota)(item).product.label_en;
+                                    } catch (e:Error) {
+                                    }
+                                    return "N/A";
+                                }
+
+                                private function sortFarmQuotaProduct(obj1:FarmQuota, obj2:FarmQuota):int {
+                                    return ObjectUtil.stringCompare(obj1.product.label_en + obj1.representativeFarm.FADNRegion.name + obj1.representativeFarm.description + obj1.quotaLevel, obj2.product.label_en + obj2.representativeFarm.FADNRegion.name + obj2.representativeFarm.description + obj2.quotaLevel);
+                                }
+
+                                private function fq_region(item:Object, column:DataGridColumn):String {
+                                    try {
+                                        return (FarmQuota)(item).representativeFarm.FADNRegion.name;
+                                    } catch (e:Error) {
+                                    }
+                                    return "N/A";
+                                }
+
+                                private function sortFarmQuotaFADNRegion(obj1:FarmQuota, obj2:FarmQuota):int {
+                                    return ObjectUtil.stringCompare(obj1.representativeFarm.FADNRegion.name + obj1.representativeFarm.description + obj1.product.label_en + obj1.quotaLevel, obj2.representativeFarm.FADNRegion.name + obj2.representativeFarm.description + obj2.product.label_en + obj2.quotaLevel);
+                                }
+
+                                private function fq_farmtype(item:Object, column:DataGridColumn):String {
+                                    try {
+                                        return (FarmQuota)(item).representativeFarm.description;
+                                    } catch (e:Error) {
+                                    }
+                                    return "N/A";
+                                }
+
+                                private function sortFarmQuotaRepresentativeFarm(obj1:FarmQuota, obj2:FarmQuota):int {
+                                    return ObjectUtil.stringCompare(obj1.representativeFarm.description + obj1.representativeFarm.FADNRegion.name + obj1.product.label_en + obj1.quotaLevel, obj2.representativeFarm.description + obj2.representativeFarm.FADNRegion.name + obj2.product.label_en + obj2.quotaLevel);
+                                }
+			
+							]]>
+							</mx:Script>
+                            <ns:DataGridRowColor id="dgQuota"
+                                                 width="100%"
+                                                 height="100%"
+                                                 dataProvider="{myQuota}"
+                                                 editable="true"
+                                                 itemEditEnd="{validatGridInput(event,0,Number.MAX_VALUE,dgQuota);}"
+                                                 rowColorFunction="quotaColor"
+                                    >
+                                <ns:columns>
+                                    <!-- nutsRegion.label_eng -->
+                                    <mx:DataGridColumn headerText="Region"
+                                                       editable="false"
+                                                       sortDescending="true"
+                                                       labelFunction="fq_region"
+                                                       sortCompareFunction="sortFarmQuotaFADNRegion"/>
+                                    <!-- representativFarm.description (Maybe empty) -->
+                                    <mx:DataGridColumn headerText="Farmtype"
+                                                       editable="false"
+                                                       sortDescending="true"
+                                                       labelFunction="fq_farmtype"
+                                                       sortCompareFunction="sortFarmQuotaRepresentativeFarm"/>
+                                    <!-- product.label_eng -->
+                                    <mx:DataGridColumn headerText="Crop/animal product"
+                                                       editable="false"
+                                                       sortDescending="true"
+                                                       labelFunction="quotaProduct"
+                                                       sortCompareFunction="sortFarmQuotaProduct"
+                                            />
+
+                                    <!-- farmquota.quotaLevel -->
+                                    <mx:DataGridColumn headerText="Level"
+                                                       editable="false"
+                                                       sortDescending="true"
+                                                       dataField="quotaLevel"/>
+                                    <!-- farmQuota.quotaAmount -->
+                                    <ns:FormattedDataGridColomn percision="2"
+                                                                headerText="Amount (t)"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"
+                                                                dataField="quotaAmount"/>
+                                    <ns:FormattedDataGridColomn percision="2"
+                                                                headerText="Baseline amount (t)"
+                                                                editable="false"
+                                                                textAlign="right"
+                                                                dataField="baselineQuotaAmount"/>
+
+                                    <ns:FormattedDataGridColomn percision="2"
+                                                                headerText="Additional price (€/t)"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"
+                                                                dataField="additionalPrice"/>
+                                    <ns:FormattedDataGridColomn percision="2"
+                                                                headerText="Baseline ap (€/t)"
+                                                                editable="false"
+                                                                textAlign="right"
+                                                                dataField="baselineAdditionalPrice"/>
+
+                                </ns:columns>
+                            </ns:DataGridRowColor>
+                            <mx:HBox width="100%" horizontalAlign="right">
+                                <mx:Button label="Reset to baseline"
+                                           click="{resetFarmQuotas2Baseline()}"
+                                           enabled="{_isEnable}"
+                                           visible="{_showCtrl}"
+                                           includeInLayout="{_showCtrl}"/>
+                            </mx:HBox>
+                        </mx:Panel>
+                    </mx:Canvas>
+
+
+                    <!-- Command and control measures  -->
+                    <!-- Policy meassure (in the ontology) -->
+                    <mx:Panel id="tabControlMeasure" visible="false"
+                              width="100%"
+                              height="100%"
+                              label="Control measures"
+                              toolTip="" layout="vertical">
+                        <mx:Script>
+							<![CDATA[
+								import org.seamless_ip.services.transferobjects.farmopt.SubsidyCrossCompliance;
+                            import org.seamless_ip.services.transferobjects.farmopt.Tax;
+
+                            private function policyMeasureRule(item:Object, column:DataGridColumn):String {
+                                try {
+                                    if (item is Tax) {
+                                        return "Tax";
+                                    } else if (item is Penalty) {
+                                        return "Penalty";
+                                    } else if (item is SubsidyCrossCompliance) {
+                                        return "Subsidy";
+                                    }
+                                } catch (e:Error) {
+                                }
+                                return "No rule";
+                            }
+
+                            private function policyMeasureRegion(item:Object, column:DataGridColumn):String {
+                                try {
+                                    if (item is Tax) {
+                                        return (item as Tax).NUTSRegion.name;
+                                    } else if (item is Penalty) {
+                                        return (item as Penalty).NUTSRegion.name;
+                                    } else if (item is SubsidyCrossCompliance) {
+                                        return (item as SubsidyCrossCompliance).NUTSRegion.name;
+                                    }
+                                } catch (e:Error) {
+                                }
+                                return "No Region";
+                            }
+
+                            public function removePolicyMeasure(data:Object):void {
+                                myPolicyMeasures.removeItemAt(1);
+                            }
+
+                            public function onDataGridHeaderButtonClick
+                                    (avEvent :Event,
+                                     avData  :Object)
+                                    :void
+                            {
+                                for (var i:int; i < myPolicyMeasures.length; i++) {
+                                    if (avData == myPolicyMeasures.getItemAt(i)) {
+                                        myPolicyMeasures.removeItemAt(i);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            private function alklisakjd():void {
+
+                            }
+			
+							]]>
+							</mx:Script>
+                        <ns:DataGridRowColor id="dgCommansAndControl"
+                                             width="100%"
+                                             height="100%"
+                                             dataProvider="{myPolicyMeasures}"
+                                             editable="true"
+                                             dragEnabled="true"
+                                             dragMoveEnabled="true"
+                                >
+                            <ns:columns>
+                                <!-- Region is missing in the ontology -->
+                                <mx:DataGridColumn headerText="Region"
+                                                   editable="false"
+                                                   labelFunction="policyMeasureRegion"
+                                                   sortDescending="true"/>
+                                <!-- bollean minimum -->
+                                <mx:DataGridColumn headerText="Min"
+                                                   editable="false"
+                                                   fontWeight="bold"
+                                                   dataField="minimum"
+                                                   itemRenderer="org.seamless_ip.ui.experimentdesigner.CheckboxRendererCM"
+                                        />
+                                <!-- Implement with inheritance frm PolicyMeasure -->
+                                <mx:DataGridColumn headerText="Rule"
+                                                   editable="false"
+                                                   sortDescending="true"
+                                                   labelFunction="policyMeasureRule"/>
+                                <ns:FormattedDataGridColomn percision="2"
+                                                            headerText="Rule level"
+                                                            editable="true"
+                                                            textAlign="right"
+                                                            fontWeight="bold"
+                                                            dataField="ruleLevel"
+
+                                        />
+                                <!-- if more then one of the rest is != 0 warn -->
+                                <ns:FormattedDataGridColomn percision="2"
+                                                            headerText="Erosion (unit missing)"
+                                                            editable="true"
+                                                            textAlign="right"
+                                                            fontWeight="bold"
+                                                            dataField="erosion"/>
+                                <ns:FormattedDataGridColomn percision="2"
+                                                            headerText="Irrigation water availability (m3/ha)"
+                                                            editable="true"
+                                                            textAlign="right"
+                                                            fontWeight="bold"
+                                                            dataField="irrigationWaterAvailability"/>
+                                <ns:FormattedDataGridColomn percision="2"
+                                                            headerText="Nitrate leaching (kg NO3-N/ha)"
+                                                            editable="true"
+                                                            textAlign="right"
+                                                            fontWeight="bold"
+                                                            dataField="nitrateleaching"/>
+                                <ns:FormattedDataGridColomn percision="2"
+                                                            headerText="Nitrogen use (kg N/ha)"
+                                                            editable="true"
+                                                            textAlign="right"
+                                                            fontWeight="bold"
+                                                            dataField="nitrogenUse"/>
+                                <ns:FormattedDataGridColomn percision="2"
+                                                            headerText="Nitrogen use organic (kg N/ha)"
+                                                            editable="true"
+                                                            textAlign="right"
+                                                            fontWeight="bold"
+                                                            dataField="nitrogenUseOrganic"
+                                        />
+                                <ns:FormattedDataGridColomn percision="2"
+                                                            headerText="Pesticide Pressure (unit missing)"
+                                                            editable="true"
+                                                            textAlign="right"
+                                                            fontWeight="bold"
+                                                            dataField="pesticidePressure"/>
+                                <ns:FormattedDataGridColomn percision="2"
+                                                            headerText="Soil organic matter change (%/year)"
+                                                            editable="true"
+                                                            textAlign="right"
+                                                            fontWeight="bold"
+                                                            dataField="soilOrganicMatter"/>
+                                <mx:DataGridColumn editable="false" visible="{_showCtrl}">
+                                    <mx:itemRenderer>
+                                        <mx:Component>
+                                            <mx:HBox>
+                                                <mx:Button label="Delete"
+                                                           click="outerDocument.onDataGridHeaderButtonClick( event, data )"/>
+                                            </mx:HBox>
+                                        </mx:Component>
+                                    </mx:itemRenderer>
+                                </mx:DataGridColumn>
+
+                            </ns:columns>
+                        </ns:DataGridRowColor>
+                        <ns1:PolicyMeasure myPolicyMeasures="{myPolicyMeasures}" id="ucPolicyMeasure"
+                                           enabled="{_isEnable}"
+                                           visible="{_showCtrl}"
+                                           includeInLayout="{_showCtrl}"/>
+                    </mx:Panel>
+
+
+                    <!-- Set aside regulation  -->
+                    <mx:Canvas id="tabSetASide"
+                               width="100%"
+                               height="100%"
+                               label="Set aside regulation"
+                               toolTip="Obligatory set aside is one element of the CAP. The percentage value set
+						is meant relative to the grand culture area observed in the base year.">
+                        <mx:Panel layout="vertical" height="100%" width="100%">
+                            <mx:Script>
+							<![CDATA[
+							private function sa_getCountryAggregate(item:Object, column:DataGridColumn):String
+                                {
+                                    return (SetAsideRegulation)(item).countryAggregate.name;
+                                }
+
+                                private function sortSetAsideRegulationCountryAggregate(obj1:SetAsideRegulation, obj2:SetAsideRegulation):int {
+                                    return ObjectUtil.stringCompare(obj1.countryAggregate.name, obj2.countryAggregate.name);
+                                }
+			
+							]]>
+							</mx:Script>
+                            <ns:DataGridRowColor id="dgSetaside"
+                                                 width="100%"
+                                                 height="100%"
+                                                 dataProvider="{mySetaside}"
+                                                 editable="true"
+                                                 itemEditEnd="{validatGridInput(event,0,100,dgSetaside);}"
+                                                 rowColorFunction="rowColorSA">
+                                <ns:columns>
+                                    <mx:DataGridColumn headerText="Country aggregate"
+                                                       labelFunction="sa_getCountryAggregate"
+                                                       editable="false"
+                                                       sortCompareFunction="sortSetAsideRegulationCountryAggregate"
+                                                       sortDescending="true"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Min value (%)"
+                                                                dataField="valueMin"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Baseline min value (%)"
+                                                                editable="false"
+                                                                textAlign="right"
+                                                                dataField="baselineValueMin"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Max value (%)"
+                                                                dataField="valueMax"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Baseline max value (%)"
+                                                                editable="false"
+                                                                textAlign="right"
+                                                                dataField="baselineValueMax"
+                                            />
+                                </ns:columns>
+                            </ns:DataGridRowColor>
+                            <mx:HBox width="100%" horizontalAlign="right">
+                                <mx:Button label="Reset to baseline"
+                                           click="{resetSetAsideRegulation2Baseline()}"
+                                           enabled="{_isEnable}"
+                                           visible="{_showCtrl}"
+                                           includeInLayout="{_showCtrl}"/>
+                            </mx:HBox>
+                        </mx:Panel>
+                    </mx:Canvas>
+
+                    <!-- Coupling degree of subsidies  -->
+                    <mx:Script>
+					<![CDATA[
+					private function rowColorCD(item:Object, color:uint):uint
+                        {
+                            var theV:Number = ((CouplingDegree)(item)).value;
+                            var theB:Number = (((CouplingDegree)(item)).BaseLineValue);
+                            return diffColor(theV, theB, color);
+                        }
+
+                        private function cd_country(item:Object, column:DataGridColumn):String {
+                            return (CouplingDegree)(item).country.name;
+                        }
+
+                        private function sortCouplingDegreeCountry(obj1:CouplingDegree, obj2:CouplingDegree):int {
+                            return ObjectUtil.stringCompare(obj1.country.name + obj1.premiumGroup.label_en, obj2.country.name + obj2.premiumGroup.label_en);
+                        }
+
+                        private function cd_product(item:Object, column:DataGridColumn):String {
+                            return (CouplingDegree)(item).premiumGroup.label_en;
+                        }
+
+                        private function sortCouplingDegreePremiumGroup(obj1:CouplingDegree, obj2:CouplingDegree):int {
+                            return ObjectUtil.stringCompare(obj1.premiumGroup.label_en + obj1.country.name, obj2.premiumGroup.label_en + obj2.country.name);
+                        }
+
+                        private function baslineValueCD(item:Object, column:DataGridColumn):String {
+                            return nf2.format((CouplingDegree)(item).BaseLineValue);
+                        }
+					]]>
+					</mx:Script>
+                    <mx:Canvas id="tabCouplingDegree"
+                               width="100%" height="100%"
+                               label="Coupling degree of subsidies" toolTip="With the CAP reform of 2003,
+						agricultural subsidies were partly decoupled from production quantities. 
+						Here you can change the coupling degree of certain subsidy categories.">
+                        <mx:Panel layout="vertical"
+                                  height="100%" width="100%">
+
+                            <ns:DataGridRowColor id="dgCouplingDegree"
+                                                 width="100%" height="100%"
+                                                 dataProvider="{myCouplingDegree}"
+                                                 editable="true"
+                                                 itemEditEnd="{validatGridInput(event,0,100,dgCouplingDegree);}"
+                                                 rowColorFunction="rowColorCD">
+                                <ns:columns>
+                                    <mx:DataGridColumn headerText="Country"
+                                                       editable="false"
+                                                       sortDescending="true"
+                                                       labelFunction="cd_country"
+                                                       sortCompareFunction="sortCouplingDegreeCountry"/>
+                                    <mx:DataGridColumn headerText="Subsidy type"
+                                                       editable="false"
+                                                       labelFunction="cd_product"
+                                                       sortCompareFunction="sortCouplingDegreePremiumGroup"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Value (%)"
+                                                                dataField="value"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Baseline Value (%)"
+                                                                editable="false"
+                                                                textAlign="right"
+                                                                labelFunction="baslineValueCD"/>
+                                </ns:columns>
+                            </ns:DataGridRowColor>
+                            <mx:HBox width="100%" horizontalAlign="right">
+                                <mx:Button label="Reset to baseline"
+                                           click="{resetCouplingDegrees2Baseline()}"
+                                           enabled="{_isEnable}"
+                                           visible="{_showCtrl}"
+                                           includeInLayout="{_showCtrl}"/>
+                            </mx:HBox>
+                        </mx:Panel>
+                    </mx:Canvas>
+                </mx:ViewStack>
+            </mx:Panel>
+
+            <!-- Trade policies  -->
+            <mx:Panel
+                    layout="vertical"
+                    width="100%" height="100%"
+                    label="Trade policies"
+                    enabled="true">
+
+                <mx:HBox width="100%"
+                         horizontalAlign="right">
+                </mx:HBox>
+                <mx:TabBar id="toolBarBJPolicyTP"
+                           dataProvider="viewTP"
+                           width="100%"/>
+                <mx:ViewStack id="viewTP"
+                              width="100%" height="100%">
+                    <!-- Global trade  -->
+                    <mx:Canvas id="tabGlobalTrade" label="Global trade"
+                               width="100%" height="100%"
+                               toolTip="Here you can change border tariffs for all importing countries that do not benefit from preferential agreements.
+						  These tariffs can either be defined in relative terms (ad valorem to the border price) or in absolute ones. 
+						  For some of the products both do exist. ">
+                        <mx:Panel
+                                layout="vertical"
+                                height="100%" width="100%">
+                            <mx:Script>
+							<![CDATA[
+
+							private function gt_country(item:Object, column:DataGridColumn):String {
+                                    return (GlobalTariff)(item).countryAggregate.name;
+                                }
+
+                                private function sortGlobalTariffCountryAggregate(obj1:GlobalTariff, obj2:GlobalTariff):int {
+                                    return ObjectUtil.stringCompare(obj1.countryAggregate.name + obj1.productGroup.label_en, obj2.countryAggregate.name + obj2.productGroup.label_en);
+                                }
+
+                                private function gt_product(item:Object, column:DataGridColumn):String {
+                                    return (GlobalTariff)(item).productGroup.label_en;
+                                }
+
+                                private function sortGlobalTariffProductGroup(obj1:GlobalTariff, obj2:GlobalTariff):int {
+                                    return ObjectUtil.stringCompare(obj1.productGroup.label_en + obj1.countryAggregate.name, obj2.productGroup.label_en + obj2.countryAggregate.name);
+                                }
+							]]>
+							</mx:Script>
+                            <ns:DataGridRowColor id="dgGlobalTrade"
+                                                 width="100%" height="100%"
+                                                 dataProvider="{myGlobalTrade}"
+                                                 editable="true"
+                                                 itemEditEnd="{validatGridInput(event,0,Number.MAX_VALUE,dgGlobalTrade);}"
+                                                 rowColorFunction="rowColorGT">
+                                <ns:columns>
+                                    <mx:DataGridColumn headerText="Importer"
+                                                       editable="false"
+                                                       sortDescending="true"
+                                                       labelFunction="gt_country"
+                                                       sortCompareFunction="sortGlobalTariffCountryAggregate"/>
+                                    <mx:DataGridColumn headerText="Product"
+                                                       editable="false"
+                                                       labelFunction="gt_product"
+                                                       sortCompareFunction="sortGlobalTariffProductGroup"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Ad valorem tariff (%)"
+                                                                dataField="adValorem"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"/>
+                                    <ns:FormattedDataGridColomn percision="2"
+                                                                headerText="Baseline Ad valorem tariff (%)"
+                                                                editable="false"
+                                                                textAlign="right"
+                                                                dataField="baslineAdvalorem"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Specific tariff (€/t)"
+                                                                dataField="specificTariff"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"/>
+                                    <ns:FormattedDataGridColomn percision="2"
+                                                                headerText="Baseline Specific tariff (€/t)"
+                                                                editable="false"
+                                                                textAlign="right"
+                                                                dataField="baslineSpecifictariff"/>
+                                </ns:columns>
+                            </ns:DataGridRowColor>
+                            <mx:HBox width="100%" horizontalAlign="right">
+                                <mx:Button label="Reset to baseline"
+                                           click="{resetGlobalTariff2Baseline()}"
+                                           enabled="{_isEnable}"
+                                           visible="{_showCtrl}"
+                                           includeInLayout="{_showCtrl}"/>
+                            </mx:HBox>
+                        </mx:Panel>
+                    </mx:Canvas>
+
+                    <!-- Bilateral  trade  -->
+                    <mx:Canvas id="tabBilateralTrade"
+                               label="Bilateral trade"
+                               width="100%" height="100%"
+                               toolTip="Bilateral trade agreements exist between some trading partners.
+					 One prominent instrument are tariff rate quotas (TRQs) associated with preferential tariffs.
+					  For quantities imported ahead of those quotas, global tariffs are applied.">
+                        <mx:Panel
+                                layout="vertical"
+                                height="100%" width="100%">
+                            <mx:Script>
+							<![CDATA[
+											
+							private function bt_icontry(item:Object, column:DataGridColumn):String {
+                                    return (BilateralTariff)(item).fromCountryAggregate.name;
+                                }
+
+                                private function sortBilateralTariffFromCountryAggregate(obj1:BilateralTariff, obj2:BilateralTariff):int {
+                                    return ObjectUtil.stringCompare(obj1.fromCountryAggregate.name + obj1.toCountryAggregate.name + obj1.productGroup.label_en, obj2.fromCountryAggregate.name + obj2.toCountryAggregate.name + obj2.productGroup.label_en);
+                                }
+
+                                private function bt_econtry(item:Object, column:DataGridColumn):String {
+                                    return (BilateralTariff)(item).toCountryAggregate.name;
+                                }
+
+                                private function sortBilateralTariffToCountryAggregate(obj1:BilateralTariff, obj2:BilateralTariff):int {
+                                    return ObjectUtil.stringCompare(obj1.toCountryAggregate.name + obj1.fromCountryAggregate.name + obj1.productGroup.label_en, obj2.toCountryAggregate.name + obj2.fromCountryAggregate.name + obj2.productGroup.label_en);
+                                }
+
+                                private function bt_product(item:Object, column:DataGridColumn):String {
+                                    return (BilateralTariff)(item).productGroup.label_en;
+                                }
+
+                                private function sortBilateralTariffProductGroup(obj1:BilateralTariff, obj2:BilateralTariff):int {
+                                    return ObjectUtil.stringCompare(obj1.productGroup.label_en + obj1.toCountryAggregate.name + obj1.fromCountryAggregate.name, obj2.productGroup.label_en + obj2.toCountryAggregate.name + obj2.fromCountryAggregate.name);
+                                }
+							
+							]]>
+							</mx:Script>
+                            <ns:DataGridRowColor id="dgBilateralTrad"
+                                                 width="100%" height="100%"
+                                                 dataProvider="{myBilateralTrad}"
+                                                 editable="true"
+                                                 itemEditEnd="{validatGridInput(event,0,Number.MAX_VALUE,dgBilateralTrad);}"
+                                                 rowColorFunction="rowColorBT">
+                                <ns:columns>
+                                    <mx:DataGridColumn headerText="Importer"
+                                                       editable="false"
+                                                       sortDescending="true"
+                                                       labelFunction="bt_icontry"
+                                                       sortCompareFunction="sortBilateralTariffFromCountryAggregate"/>
+                                    <mx:DataGridColumn headerText="Exporter"
+                                                       editable="false"
+                                                       sortDescending="true"
+                                                       labelFunction="bt_econtry"
+                                                       sortCompareFunction="sortBilateralTariffToCountryAggregate"/>
+                                    <mx:DataGridColumn headerText="Product"
+                                                       editable="false"
+                                                       labelFunction="bt_product"
+                                                       sortCompareFunction="sortBilateralTariffProductGroup"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Ad valorem tariff (%)"
+                                                                dataField="adValorem"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Baseline"
+                                                                editable="false"
+                                                                textAlign="right"
+                                                                dataField="baslineAdvalorem"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Specific tariff (€/t)"
+                                                                dataField="specificTariff"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Baseline"
+                                                                editable="false"
+                                                                textAlign="right"
+                                                                dataField="baslineSpecifictariff"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="TRQ (1000t)"
+                                                                dataField="tariffRateQuota"
+                                                                editable="true"
+                                                                textAlign="right"
+                                                                fontWeight="bold"/>
+                                    <ns:FormattedDataGridColomn percision="2" headerText="Baseline"
+                                                                dataField="baslineTariffratequota"
+                                                                textAlign="right"
+                                                                editable="false"
+                                            />
+                                </ns:columns>
+                            </ns:DataGridRowColor>
+                            <mx:HBox width="100%" horizontalAlign="right">
+                                <mx:Button label="Reset to baseline"
+                                           click="{resetBilateralTariff2Baseline()}"
+                                           enabled="{_isEnable}"
+                                           visible="{_showCtrl}"
+                                           includeInLayout="{_showCtrl}"/>
+                            </mx:HBox>
+                        </mx:Panel>
+                    </mx:Canvas>
+
+                    <!-- Trade reform proposal   -->
+                    <mx:Script>
+							<![CDATA[
+											
+							
+						private function policyRuleChanged():void
+                        {
+                            if (chkRuleBasedTP.selected) {
+                                currentState = 'tradeRule';
+                            } else {
+                                currentState = 'noTradeRule';
+                            }
+                        }
+
+                        private function onTradeRPClick(e:ListEvent):void {
+                            var trp:TradeReformProposal = (e.itemRenderer.data as TradeReformProposal)
+                            maximumAdV.enabled = true;
+                            theTradeReformProposal = trp;
+                            maximumAdV.text = theTradeReformProposal.CAPValue.toString();
+
+                            // dgTradeReformProposal.dataProvider =  theTradeReformProposal.tradeReformProposalCuts;
+
+                            myTradeReformProposalCuts = theTradeReformProposal.tradeReformProposalCuts;
+                            // myTradeReformProposalCut = trp.tradeReformProposalCut;
+                        }
+
+                        private function TradeRPLostFocus() :void {
+                            if (isNaN(new Number(maximumAdV.text)) == false) {
+                                theTradeReformProposal.CAPValue = parseFloat(maximumAdV.text);
+                            }
+
+                        }
+
+                        private function selectPreTRPCUT():void {
+                            if (myTradeReformProposal.length > 0) {
+                                dgTRPCountry.selectedIndex = 0;
+                                dgTRPCountry.validateNow();
+                                dgTRPCountry.scrollToIndex(0);
+                            }
+                        }
+
+                        private function trp_country(item:Object, column:DataGridColumn):String {
+                            if (item != null) {
+                                return (TradeReformProposal)(item).fromCountryAggregate.name;
+                            } else {
+                                return "";
+                            }
+                        }
+
+                        private function tpCreateCompleate():void {
+                            chkRuleBasedTP.selected = myTradereformactivated;
+                        }
+
+
+                        private function TradeReformProposalSelectedItem():void
+                        {
+                            try {
+                                dgTradeReformProposal.selectedIndex = 0;
+                            } catch (e:Error) {
+
+                            }
+                        }
+   						
+   						]]>
+						</mx:Script>
+                    <mx:Canvas id="tabTradeReformProposal"
+                               width="100%" height="100%"
+                               label="Trade reform proposal"
+
+                               toolTip="Here you can change the parameters of a tariff reduction rule in line with proposals for a WTO reform.
+						 The formula foresees a  reduction in border protection depending on the initial level of protection and the developing status of a nation.
+						  You can change the linear cuts associated to a threshold corridor and the maximum allowed ad valorem tariff. ">
+                        <mx:VBox width="100%" height="100%">
+                            <mx:CheckBox id="chkRuleBasedTP" label="Use rule based Trade policies"
+                                         click="{ myTradereformactivated = chkRuleBasedTP.selected}"
+                                         selected="{myTradereformactivated}"
+                                         creationComplete="{tpCreateCompleate()}"
+                                         enabled="{_isEnable}"/>
+                            <mx:Canvas width="100%" height="100%" id="canvasRBTP" enabled="{chkRuleBasedTP.selected}">
+                                <mx:HBox width="100%" height="100%" x="10" y="10">
+                                    <mx:DataGrid id="dgTRPCountry" height="100%" width="30%"
+                                                 itemClick="{onTradeRPClick( event );}"
+                                                 editable="false"
+                                                 dataProvider="{myTradeReformProposal}"
+                                                 creationComplete="{TradeReformProposalSelectedItem()}"
+                                                 toolTip="Select country aggregate">
+                                        <mx:columns>
+                                            <mx:DataGridColumn
+                                                    headerText="Country aggregate"
+                                                    editable="false"
+                                                    sortDescending="true"
+                                                    labelFunction="trp_country"/>
+                                        </mx:columns>
+                                    </mx:DataGrid>
+                                    <mx:VBox width="100%" height="100%">
+                                        <mx:DataGrid width="100%" height="100%"
+                                                     dataProvider="{myTradeReformProposalCuts}"
+                                                     id="dgTradeReformProposal"
+                                                     editable="true"
+                                                     itemEditEnd="{validatGridInput(event,0,500,dgTradeReformProposal);}">
+                                            <mx:columns>
+                                                <ns:FormattedDataGridColomn percision="2"
+                                                                            headerText="Low threshold (% of Border price)"
+                                                                            dataField="thresholdLow"
+                                                                            sortDescending="true"
+                                                                            sortable="true"
+                                                                            editable="true"
+                                                                            textAlign="right"
+                                                                            fontWeight="bold"/>
+                                                <ns:FormattedDataGridColomn percision="2" headerText="Linear Cuts (%)"
+                                                                            dataField="cutoffTariff"
+                                                                            editable="true"
+                                                                            sortable="true"
+                                                                            textAlign="right"
+                                                                            fontWeight="bold"/>
+                                            </mx:columns>
+                                        </mx:DataGrid>
+                                        <mx:HBox width="100%" textAlign="right" horizontalAlign="right" height="66"
+                                                 verticalAlign="bottom">
+                                            <mx:Text text="Maximum ad valorem tariff"/>
+                                            <mx:TextInput id="maximumAdV" restrict="0123456789."
+                                                          maxChars="3"
+                                                          text=""
+                                                          width="40"
+                                                          editable="true"
+                                                          enabled="false"
+                                                          change="{TradeRPLostFocus()}"
+                                                          fontWeight="bold"/>
+                                            <mx:Text text=" % of border price"/>
+                                        </mx:HBox>
+                                    </mx:VBox>
+                                </mx:HBox>
+                            </mx:Canvas>
+                        </mx:VBox>
+                    </mx:Canvas>
+                </mx:ViewStack>
+            </mx:Panel>
+        </mx:ViewStack>
+    </mx:Panel>
+
+</mx:Canvas>

@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: TopicsIndex.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="100%" 
+	height="100%">
+
+    <!--
+    Screen for accessing help topic and background information.
+    -->
+	<mx:Script>
+		<![CDATA[
+			import mx.rpc.events.ResultEvent;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.rpc.events.FaultEvent;
+			import mx.core.Application;
+
+			// tracker for number of server requests in progress			
+			[Bindable] public var requestsInProgress:Number = 0;
+			// progress message
+			[Bindable] public var progressMessage:String = "Idle";
+			// list of available help topics
+			[Bindable] private var _topics:ArrayCollection;
+
+
+			/**
+			 * Initialises the component, retrieves an initial help topic
+			 * list from the server. 
+			 */
+			public function init():void {
+				getAllTopics();
+			}
+
+			
+			/**
+			 * Generic handler for server errors.
+			 */
+			private function serverFaultHandler(event:FaultEvent):void {
+				Alert.show("Error retrieving data from server: " + event.fault.faultString, "Server error");
+				updateProgress(true);
+			} 
+
+
+			/**
+			 * Handles the result for the recieveHelpTopics remote method call
+			 * by updating the list of available topics.
+			 */
+			private function receiveHelpTopicsHandler(event:ResultEvent):void {
+				_topics = event.result as ArrayCollection;
+				updateProgress(true);
+			} 
+			
+			
+			/**
+			 * Retrieves all available help topics from the server.
+			 */
+			private function getAllTopics():void {
+				helpTopicService.findAll();
+				updateProgress(false);
+			}
+			
+			
+			/**
+			 * Retrieves all available help topics from the server that
+			 * match the current search keywords.
+			 */
+			private function searchTopics():void {
+				if (searchTextInput.text != null) {
+					helpTopicService.search(searchTextInput.text);
+					updateProgress(false);
+				}
+			}
+
+
+			/**
+			 * Updates the server request progress state of the component by
+			 * tracking the number of started and completed tasks. As long as
+			 * there are active tasks (downloads in progress) a progress view
+			 * will be made visible.
+			 */
+			private function updateProgress(taskCompleted:Boolean = false):void {
+				if (!taskCompleted) {
+					requestsInProgress++;
+				}
+				else {
+					if (requestsInProgress > 0)
+						requestsInProgress--;
+				}
+
+				if (requestsInProgress > 0) {
+					progressMessage = "Download in progress, " + requestsInProgress + " task(s) remaining";
+					helpTopicsList.enabled = false;
+				}
+				else {
+					progressMessage = "Download completed";
+					helpTopicsList.enabled = true;
+				}
+				updateButtonState();
+			}
+
+
+			/**
+			 * Updates the state of the buttons in the component according
+			 * to content and current selection.
+			 */
+			private function updateButtonState():void {
+				showHelpTopicButton.enabled = (helpTopicsList.selectedItem != null);
+			}
+
+
+			/**
+			 * Displays the selected help topic in a new browser window.
+			 */
+			private function showHelpTopic():void {
+				var topic:Object = helpTopicsList.selectedItem;
+				if ((topic != null) && (topic.hasOwnProperty("weblink"))) {
+					var request:URLRequest = new URLRequest(topic.weblink);
+					navigateToURL(request);	
+				}
+			}
+		]]>
+	</mx:Script>
+
+	<!-- 
+	===========================================================================
+		Server Access
+	===========================================================================
+	-->
+
+	<mx:RemoteObject id="helpTopicService" 
+		destination="helpTopicService"
+		>
+		<!-- Collection<HelpTopicTO> findAll() -->
+		<mx:method name="findAll" 
+			fault="serverFaultHandler(event)" 
+			result="receiveHelpTopicsHandler(event)"
+			/>
+		<!-- Collection<HelpTopicTO> search(String searchText) -->
+		<mx:method name="search" 
+			fault="serverFaultHandler(event)" 
+			result="receiveHelpTopicsHandler(event)"
+			/>
+	</mx:RemoteObject>
+
+	<!-- 
+	===========================================================================
+		Components
+	===========================================================================
+	-->
+	
+	<mx:HBox width="100%" 
+		horizontalAlign="center" verticalAlign="middle"
+		borderStyle="solid" cornerRadius="10" 
+		paddingBottom="10" paddingTop="10" 
+		paddingLeft="10" paddingRight="10"  
+		backgroundAlpha="0.5" backgroundColor="0xECF7DE">		 
+		<mx:LinkButton id="allTopicsButton"
+			label="All Topics"
+			click="getAllTopics()"
+			icon="@Embed('/img/icons/seamless-topics.gif')"
+			disabledIcon="@Embed('/img/icons/seamless-topics-greyed.gif')"
+			/>
+		<mx:Spacer width="100%"/>
+		<mx:Label text="Find:"/>
+		<mx:TextInput id="searchTextInput" width="200"/>
+		<mx:LinkButton id="searchButton"
+			label="Search Topics"
+			enabled="{searchTextInput.text.length > 0}"
+			click="searchTopics()"
+			icon="@Embed('/img/icons/seamless-find.gif')"
+			disabledIcon="@Embed('/img/icons/seamless-find-greyed.gif')"
+			/>
+	</mx:HBox>
+
+	<mx:List id="helpTopicsList"
+		width="100%" 
+		height="100%"
+		dataProvider="{_topics}"
+		itemRenderer="org.seamless_ip.ui.help.HelpTopicRenderer"
+		change="updateButtonState()"
+		doubleClick="showHelpTopic()"
+		doubleClickEnabled="true"
+		backgroundAlpha="0.5" backgroundColor="0xECF7DE"
+		paddingBottom="10" paddingTop="10" 
+		paddingLeft="10" paddingRight="10" 
+		borderStyle="solid" cornerRadius="10"/>
+
+	<mx:HBox width="100%" horizontalAlign="center" verticalAlign="middle">
+		<mx:Label id="progressLabel" text="{progressMessage}" enabled="false"/>
+		<mx:Spacer width="100%"/>
+		<mx:LinkButton id="showHelpTopicButton"
+			label="Show Topic..." 
+			toolTip="Open the selected help topic in new window"
+			click="showHelpTopic()"
+			icon="@Embed('/img/icons/seamless-show.gif')"
+			disabledIcon="@Embed('/img/icons/seamless-show-greyed.gif')"
+			/>
+	</mx:HBox>
+</mx:VBox>

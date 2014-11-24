@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: CompositionViewer.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+         xmlns:components="org.seamless_ip.ui.compositioneditor.components.*"
+         xmlns:common="org.seamless_ip.ui.common.*"
+         xmlns:adobe="http://www.adobe.com/2006/fc"
+         width="100%" height="100%"
+         paddingLeft="10"
+         paddingRight="10"
+         paddingTop="10"
+         paddingBottom="10"
+         backgroundAlpha="0.0"
+         creationComplete="init()"
+        >
+
+    <mx:Script>
+        <![CDATA[
+
+        /**
+         * Component to view available model chains.
+         */
+
+        import mx.collections.ArrayCollection;
+        import mx.rpc.events.FaultEvent;
+        import mx.rpc.events.ResultEvent;
+
+        import org.seamless_ip.services.transferobjects.indi.IIndicator;
+        import org.seamless_ip.services.transferobjects.seamproj.ModelChain;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.ui.enums.EnumClassName;
+
+        [Bindable]
+        public var requestsInProgress:Number = 0;
+        [Bindable]
+        public var progressMessage:String = "Idle";
+
+        [Bindable]
+        private var _project:Project = null;
+        [Bindable]
+        private var _chains:ArrayCollection = new ArrayCollection();
+        [Bindable]
+        private var _projectIndicators:ArrayCollection = new ArrayCollection();
+        [Bindable]
+        private var _graphXml:XML;
+
+
+        /**
+         * Initialises the view for the specified project. Selection of
+         * indicators could have been changed so need to reload it.
+         */
+        public function init(project:Project = null):void {
+            _project = project;
+            _projectIndicators.removeAll();
+
+            if (_project != null) {
+                resultPresentationService.retrieveEnumerationValues(EnumClassName.MODELCHAIN.value);
+                updateProgress();
+
+                resultPresentationService.retrieveIndicatorsForProject(_project);
+                updateProgress();
+            }
+        }
+
+
+        /**
+         * Handle errors received from the server.
+         */
+        private function serverFaultHandler(event:FaultEvent):void {
+            updateProgress(true);
+        }
+
+
+        /**
+         * Handle results received from the server.
+         */
+        private function retrieveIndicatorsHandler(event:ResultEvent):void {
+            _projectIndicators = event.result as ArrayCollection;
+            updateProgress(true);
+        }
+
+
+        /**
+         * Handle results received from the server.
+         */
+        private function retrieveEnumerationValuesHandler(event:ResultEvent):void {
+            _chains = event.result as ArrayCollection;
+
+            // add a dummy model chain with an overview of all models
+            var dummy:ModelChain = new ModelChain();
+            dummy.id = null;
+            dummy.label = "Overview of all SEAMLESS-IF models";
+            dummy.description = "An overview of all the SEAMLESS-IF models, both included and not included in the system.";
+            dummy.spatialScale = null;
+            dummy.temporalScale = null;
+            _chains.addItem(dummy);
+
+            updateProgress(true);
+        }
+
+
+        private function updateProgress(taskCompleted:Boolean = false):void {
+            if (!taskCompleted) {
+                requestsInProgress++;
+            } else {
+                if (requestsInProgress > 0)
+                    requestsInProgress--;
+            }
+
+            if (requestsInProgress > 0) {
+                progressMessage = "Download in progress, " + requestsInProgress + " task(s) remaining";
+                viewStackMain.selectedChild = viewProgress;
+            } else {
+                progressMessage = "Download completed";
+                setDefaultModelChain();
+                viewStackMain.selectedChild = viewEditor;
+            }
+
+            updateButtonState();
+        }
+
+
+        private function updateButtonState():void {
+            chainCombo.enabled = (requestsInProgress == 0);
+            indicatorAutoComplete.enabled = (requestsInProgress == 0);
+        }
+
+
+        private function setDefaultModelChain():void {
+            if ((_project != null) && (_project.problem != null) && (_project.problem.spatialScale != null)) {
+                // mark the chains to known which one is selected for the project
+                for each (var chain:ModelChain in _chains) {
+                    if ((chain.spatialScale != null) && (chain.spatialScale.id != null)) {
+                        if (chain.spatialScale.id == _project.problem.spatialScale.id) {
+                            chain.selected = true;
+                            chainCombo.selectedItem = chain;
+                        } else {
+                            chain.selected = false;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        private function doChangeChain(event: Event): void {
+            var chain:ModelChain = ModelChain(chainCombo.selectedItem);
+            if (chain != null) {
+                // select all models overview graph by default
+                _graphXml = graphALL_MODELS;
+
+                // FIXME: clumsy code, but currently no other way to do it
+                if (chain.label == "CAPRI")
+                    _graphXml = graphCAPRI;
+                if (chain.label == "FSSIM")
+                    _graphXml = graphFSSIM;
+                if (chain.label == "FSSIM-APES")
+                    _graphXml = graphFSSIM_APES;
+                if (chain.label == "FSSIM-EXPAMOD-CAPRI")
+                    _graphXml = graphFSSIM_EXPAMOD_CAPRI;
+                if (chain.label == "FSSIM-EXPAMOD-CAPRI-FSSIM")
+                    _graphXml = graphFSSIM_EXPAMOD_CAPRI_FSSIM;
+            }
+        }
+
+
+        private function doChangeIndicator(event: Event): void {
+            var obj: Object = event.target.selectedItem;
+            if (!obj is IIndicator)
+                return;
+
+            var indicator: IIndicator = obj as IIndicator;
+            if ((indicator != null) && (indicator.getModel() != null)) {
+                var modelId: String = indicator.getModel().id;
+                compositionComp.highLightNode(modelId);
+            }
+        }
+
+
+        private function getIndicatorLabel(obj: Object): String {
+            if (obj is IIndicator) {
+                var indicator: IIndicator = obj as IIndicator;
+                return indicator.getLabel_en();
+            } else {
+                return "";
+            }
+        }
+
+        ]]>
+    </mx:Script>
+
+    <!--
+     ===========================================================================
+         Data files with model chain graphics
+     ===========================================================================
+     -->
+
+    <mx:XML source="sampleXml/chain1Graph.xml" id="graphFSSIM"/>
+    <mx:XML source="sampleXml/chain2Graph.xml" id="graphFSSIM_EXPAMOD_CAPRI"/>
+    <mx:XML source="sampleXml/chain3Graph.xml" id="graphFSSIM_EXPAMOD_CAPRI_FSSIM"/>
+    <mx:XML source="sampleXml/chain4Graph.xml" id="graphCAPRI"/>
+    <mx:XML source="sampleXml/chain5Graph.xml" id="graphFSSIM_APES"/>
+    <mx:XML source="sampleXml/chainDummyGraph.xml" id="graphALL_MODELS"/>
+
+    <!--
+     ===========================================================================
+         Server Access
+     ===========================================================================
+     -->
+
+    <mx:RemoteObject id="resultPresentationService"
+                     destination="resultPresentationService"
+            >
+        <mx:method name="retrieveIndicatorsForProject"
+                   fault="serverFaultHandler(event)"
+                   result="retrieveIndicatorsHandler(event)"
+                />
+        <mx:method name="retrieveEnumerationValues"
+                   fault="serverFaultHandler(event)"
+                   result="retrieveEnumerationValuesHandler(event)"
+                />
+    </mx:RemoteObject>
+
+    <!--
+     ===========================================================================
+         Effects
+         Used when changing views.
+     ===========================================================================
+     -->
+
+    <mx:Fade id="viewIn" duration="600" alphaFrom="0" alphaTo="1"/>
+    <mx:Fade id="viewOut" duration="100" alphaFrom="1" alphaTo="0"/>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:ViewStack id="viewStackMain"
+                  width="100%"
+                  height="100%"
+                  creationPolicy="all"
+            >
+
+        <common:ServerProgressView id="viewProgress"
+                                   width="100%"
+                                   height="100%"
+                                   progressMessage="{progressMessage}"
+                                   showEffect="viewIn"
+                                   hideEffect="viewOut"
+                />
+
+        <mx:HBox id="viewEditor"
+                 width="100%" height="100%"
+                 showEffect="viewIn"
+                 hideEffect="viewOut"
+                >
+            <mx:VBox width="600" height="100%"
+                     verticalAlign="middle"
+                    >
+                <mx:Label text="Select the model chain to view (in bold the chain used for the project):"
+                          enabled="false"/>
+                <mx:ComboBox dataProvider="{_chains}" id="chainCombo"
+                             change="doChangeChain(event)"
+                             updateComplete="doChangeChain(event)"
+                             itemRenderer="org.seamless_ip.ui.compositioneditor.ModelChainItemRenderer"
+                             width="100%"
+                        />
+                <mx:HBox width="600" height="100%"
+                         verticalAlign="middle" horizontalAlign="center"
+                        >
+                    <components:compositionComponent id="compositionComp"
+                                                     graphML="{_graphXml}"
+                                                     backgroundAlpha="0.0"
+                            />
+                </mx:HBox>
+                <mx:Label text="Highlight model that calculates indicator:" enabled="false"/>
+                <adobe:AutoComplete id="indicatorAutoComplete"
+                                    dataProvider="{_projectIndicators}"
+                                    labelFunction="getIndicatorLabel"
+                                    click="indicatorAutoComplete.open()"
+                                    lookAhead="true"
+                                    close="doChangeIndicator(event)"
+                                    width="100%"
+                        />
+            </mx:VBox>
+            <mx:VBox width="100%" height="100%">
+                <mx:Label text="Description:" enabled="false"/>
+                <mx:TextArea width="100%" height="100%"
+                             text="{chainCombo.selectedItem.description}"
+                             editable="false"
+                             wordWrap="true"
+                             borderStyle="solid"
+                             cornerRadius="10" alpha="0.5"
+                        />
+            </mx:VBox>
+        </mx:HBox>
+    </mx:ViewStack>
+</mx:VBox>

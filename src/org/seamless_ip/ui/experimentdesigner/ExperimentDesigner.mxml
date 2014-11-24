@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: ExperimentDesigner.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+           width="100%" height="100%"
+           xmlns:ns1="org.seamless_ip.ui.experimentdesigner.*"
+           xmlns:common="org.seamless_ip.ui.common.*"
+           creationComplete="init();"
+           show="show()">
+    <mx:Script>
+		<![CDATA[
+		import org.seamless_ip.services.transferobjects.seamproj.BiophysicalSimulation;
+        import mx.collections.ArrayCollection;
+
+        import org.seamless_ip.services.remoting.RequestProgressEvent;
+        import org.seamless_ip.services.transferobjects.seamproj.ExperimentNarrative;
+        import org.seamless_ip.services.transferobjects.seamproj.ModelChain;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.SpatialScale;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+        import org.seamless_ip.ui.enums.EnumClassName;
+        import org.seamless_ip.ui.enums.EnumManager;
+        import org.seamless_ip.ui.narratives.NarrativeServices;
+
+        // Only used for debugging
+        private var contextOn:Boolean = true;
+        private var outlookOn:Boolean = true;
+        private var policyOn:Boolean = true;
+
+        private var lastProblemId:String = "-666";
+
+        /* 	[Bindable]
+         public var eventOutlookSaveReady:ExperimentDesignerEvent = new ExperimentDesignerEvent(ExperimentDesignerEvent.EXPERIMENT_OUTLOOK_SAVE_READY);
+         [Bindable]
+         public var eventOutlookLoadReady:ExperimentDesignerEvent  = new ExperimentDesignerEvent(ExperimentDesignerEvent.EXPERIMENT_OUTLOOK_LOAD_READY);;
+         */
+
+
+
+        // The user
+        [Bindable]
+        private var _user:User = new User();
+
+        public function set user(user:User):void {
+            _user = user;
+        }
+
+        // Narrative service used to get the experiment
+        [Bindable]
+        private var _narrativeServices:NarrativeServices;
+
+        // Gets a singelton narrative service
+        public function get NarrativeServicesSingleton():NarrativeServices
+        {
+            if (_narrativeServices == null)
+            {
+                _narrativeServices = new NarrativeServices();
+                _narrativeServices.addEventListener(RequestProgressEvent.REQUEST_SEND, reqnarrativeexperimentsend);
+                _narrativeServices.addEventListener(RequestProgressEvent.REQUEST_COMPLETED, reqnarrativeexperimentcompleted);
+            }
+            return _narrativeServices;
+        }
+
+        // The project (used together with user.canDoForProject)
+        [Bindable]
+        private var _project:Project;
+
+        public function set project(project:Project):void
+        {
+            _project = project;
+        }
+
+        // A collection of the experiments belonging to the project
+        [Bindable]
+        public var experiments:ArrayCollection;
+
+        // Init function
+        private function init(): void
+        {
+            setShowSave();
+            isModified = false;
+
+            parent.addEventListener(ExperimentDesignerEvent.EXPERIMENT_OUTLOOK_LOAD_READY, experimentEvent);
+            parent.addEventListener(ExperimentDesignerEvent.EXPERIMENT_CONTEXT_LOAD_READY, experimentEvent);
+            parent.addEventListener(ExperimentDesignerEvent.EXPERIMENT_POLICY_LOAD_READY, experimentEvent);
+
+            parent.addEventListener(ExperimentDesignerEvent.EXPERIMENT_OUTLOOK_SAVE_READY, experimentEvent);
+            parent.addEventListener(ExperimentDesignerEvent.EXPERIMENT_CONTEXT_SAVE_READY, experimentEvent);
+            parent.addEventListener(ExperimentDesignerEvent.EXPERIMENT_POLICY_SAVE_READY, experimentEvent);
+        }
+
+        // Counter for the progressbar
+        private var elementsLeft:int = 0;
+
+        // Event for the experiment
+        private function experimentEvent(event:ExperimentDesignerEvent):void {
+            elementsLeft -= 1;
+            if (event.type == ExperimentDesignerEvent.EXPERIMENT_OUTLOOK_LOAD_READY ||
+                event.type == ExperimentDesignerEvent.EXPERIMENT_CONTEXT_LOAD_READY ||
+                event.type == ExperimentDesignerEvent.EXPERIMENT_POLICY_LOAD_READY) {
+
+                progressscreed.progressMessage = elementsLeft.toString() + " left to load.";
+            }
+            if (event.type == ExperimentDesignerEvent.EXPERIMENT_OUTLOOK_SAVE_READY ||
+                event.type == ExperimentDesignerEvent.EXPERIMENT_CONTEXT_SAVE_READY ||
+                event.type == ExperimentDesignerEvent.EXPERIMENT_POLICY_SAVE_READY) {
+
+                progressscreed.progressMessage = elementsLeft.toString() + " left to save.";
+            }
+            if (elementsLeft < 1) {
+                mainViewStack.selectedIndex = 1;
+            }
+
+        }
+
+        // Gets all experiments
+        private function show():void
+        {
+
+            NarrativeServicesSingleton.findAll(((Number)(_project.problem.id)));
+        }
+
+        // Gets the selected experiment
+        private function getBtnPress(data:Object):void
+        {
+            try {
+                elementsLeft = 3;
+                progressscreed.progressBarText = "LOADING";
+                progressscreed.progressMessage = "";
+
+                mainViewStack.selectedIndex = 0;
+                btnGetExperiment.enabled = false;
+                
+                var narrative:ExperimentNarrative = (ExperimentNarrative)(NarrativeServicesSingleton.experiments.getItemAt(experimentList.selectedIndex));
+                // var experimentidselected:String = narrative.id;
+                var experimentID:Number = (Number)(narrative.id);
+                setSpatialScale();
+                setShowSave();
+                if (contextOn) {
+                	contextCanvas.label = "Context: " + narrative.biophysicalSimulation.context.narrative.title;
+                    contextC.experimentID = experimentID;
+                    contextC.showCtrl = _showCtrl;
+                    contextC.getContext();
+                }
+                if (outlookOn) {
+                	outlookCanvas.label = "Outlook: " + narrative.biophysicalSimulation.outlook.narrative.title;
+                    outlookC.experimentID = experimentID;
+                    outlookC.showCtrl = _showCtrl;
+                    outlookC.getOutlook();
+                }
+                if (policyOn) {
+                	policyCanvas.label = "Policy: " + narrative.policyAssessment.policyOption.narrative.title;
+                    policyOptionC.experimentID = experimentID;
+                    policyOptionC.showCtrl = _showCtrl;
+                    policyOptionC.getPolicyOption();
+                }
+
+            } catch (e:Error) {
+
+            }
+            isModified = true;
+
+        }
+
+        // The spatial scale
+        private var _spatialscale:SpatialScale;
+
+        private function setSpatialScale():void {
+            var spatialscale:SpatialScale = _project.problem.spatialScale;
+
+            if ((_spatialscale == null) || ((_spatialscale != null) && (spatialscale != null) && (spatialscale.id != _spatialscale.id)))
+            {
+                //this rule has been copied 1:1 from ProjectDefinition.mxml
+                var spatialScales:ArrayCollection = EnumManager.instance.getEnumValues(EnumClassName.SPATIAL_SCALE);
+                var modelChains:ArrayCollection = EnumManager.instance.getEnumValues(EnumClassName.MODELCHAIN);
+                var found: Boolean;
+                for each (var item:ModelChain in modelChains)
+                {
+                    if (item.spatialScale.id == spatialscale.id)
+                    {
+                        if (outlookOn) outlookC.modelChain = item.label;
+                        if (policyOn)  policyOptionC.modelChain = item.label;
+                        ;
+                        if (contextC) contextC.modelChain = item.label;
+
+                        found = true;
+                        break;
+                    }
+                }
+
+            }
+        }
+
+        // Discard
+        private function discardBtnPress(data:Object):void
+        {
+            isModified = false;
+        }
+
+        // Save
+        private function saveBtnPress(data:Object):void
+        {
+            elementsLeft = 3;
+            progressscreed.progressBarText = "Saving";
+            progressscreed.progressMessage = "";
+            mainViewStack.selectedIndex = 0;
+            isModified = false;
+            if (policyOn) policyOptionC.updatePolicyOption();
+            if (outlookOn) outlookC.updateOutlook();
+            if (policyOn) contextC.updateContext();
+        }
+
+
+        private function reqnarrativeexperimentcompleted(event:RequestProgressEvent):void
+        {
+            if (mainViewStack != null)
+            {
+                mainViewStack.selectedIndex = 1;
+                if (lastProblemId != _project.problem.id) {
+                    lastProblemId = _project.problem.id;
+                    isModified = false;
+                }
+
+            }
+        }
+
+        private function reqnarrativeexperimentsend(event:RequestProgressEvent):void
+        {
+            if (mainViewStack != null)
+            {
+                mainViewStack.selectedIndex = 0;
+                /*progress screen*/
+                progressscreed.progressMessage = event.message;
+            }
+        }
+
+        [Bindable]
+        public var _isModified:Boolean = false;
+
+        public function set isModified(modified:Boolean):void {
+            _isModified = modified;
+            if (_isModified == false) {
+
+            }
+        }
+
+        [Bindable]
+        public function get isModified():Boolean {
+            return _isModified;
+        }
+
+        [Bindable]
+        public var _showCtrl:Boolean = false;
+
+        private function setShowSave():void {
+            _showCtrl = _user.canDoForProject(_project.id, "UPDATE", "EXPERIMENT");
+        }
+		
+			
+		]]>
+	</mx:Script>
+
+    <mx:RemoteObject>
+
+    </mx:RemoteObject>
+
+    <mx:ViewStack id="mainViewStack" width="100%" height="100%">
+        <common:ServerProgressView id="progressscreed">
+        </common:ServerProgressView>
+        <mx:VBox width="100%" height="100%">
+            <mx:HBox height="{experimentList.height +  2}" width="100%" horizontalAlign="left" verticalAlign="bottom">
+                <mx:Label text="Experiment:"/>
+                <mx:ComboBox id="experimentList"
+                     dataProvider="{_narrativeServices.experiments}"
+                     labelField="title"
+                     width="500"
+                     enabled="{!isModified}"
+                     itemRenderer="mx.controls.Label"
+                />
+                
+				<mx:Spacer width="100%"/>
+				
+                <mx:Button label="Load"
+                           id="btnGetExperiment"
+                           enabled="{!isModified}"
+                           disabledIcon="@Embed('/img/icons/refresh.gif')"
+                           click="getBtnPress(event)"
+                           icon="@Embed('/img/icons/refresh.gif')"/>
+                <mx:Button label="Discard"
+                           toolTip="Discard all changes"
+                           enabled="{isModified}"
+                           click="discardBtnPress(event)"
+                           disabledIcon="@Embed('/img/icons/delete_edit_d.gif')"
+                           icon="@Embed('/img/icons/delete_edit.gif')"/>
+                <mx:Button label="Save"
+                           id="btnSave"
+                           visible="{_showCtrl}"
+                           includeInLayout="{_showCtrl}"
+                           enabled="{isModified}"
+                           toolTip="Save all changes"
+                           click="saveBtnPress(event)"
+                           disabledIcon="@Embed('/img/icons/save_edit_d.gif')"
+                           icon="@Embed('/img/icons/save_edit.gif')"/>
+            </mx:HBox>
+            
+            <mx:Accordion x="0" y="0" width="100%" height="100%" creationPolicy="all">
+                <mx:Canvas id="contextCanvas" label="Context" height="100%" width="100%">
+                    <ns1:ContextComponent height="100%" width="100%" id="contextC" enabled="{isModified}"
+                                          user="{_user}" project="{_project}"/>
+                </mx:Canvas>
+                <mx:Canvas id="outlookCanvas" label="Outlook" height="100%" width="100%">
+                    <ns1:OutlookComponent height="100%" width="100%" id="outlookC" enabled="{isModified}"
+                                          user="{_user}" project="{_project}"/>
+                </mx:Canvas>
+                <mx:Canvas id="policyCanvas" label="Policy" height="100%" width="100%">
+                    <ns1:PolicyComponent height="100%" width="100%" id="policyOptionC" enabled="{isModified}"
+                                         user="{_user}" project="{_project}"/>
+                </mx:Canvas>
+            </mx:Accordion>
+        </mx:VBox>
+        <mx:Panel width="100%" height="100%"
+                  id="noExperimentSelected"
+                  horizontalAlign="center" verticalAlign="middle">
+            <mx:Label text="No experiement selected"/>
+        </mx:Panel>
+
+        <mx:Panel>
+            <mx:Label text="Hallo"/>
+        </mx:Panel>
+    </mx:ViewStack>
+</mx:Canvas>

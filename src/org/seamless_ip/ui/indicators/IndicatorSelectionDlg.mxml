@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: IndicatorSelectionDlg.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<sc:SizeableTitleWindow
+        xmlns:mx="http://www.adobe.com/2006/mxml"
+        xmlns:sc="org.seamless_ip.ui.common.*"
+        title="Select Indicators"
+        layout="absolute"
+        width="700" height="400"
+        showCloseButton="true"
+        creationComplete="init()"
+        borderAlpha="0.8"
+        borderColor="#e2d4b3"
+        cornerRadius="10"
+        backgroundColor="#e2d4b3"
+        >
+
+    <mx:Metadata>
+        [Event(name="change")]
+    </mx:Metadata>
+
+
+    <!--
+    Dialog box for selecting indicators.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.events.CloseEvent;
+        import mx.managers.PopUpManager;
+
+        import org.seamless_ip.services.transferobjects.indi.EndorsedIndicator;
+
+        [Bindable]
+        public var selectedIndicators:ArrayCollection; // of IIndicator
+        [Bindable]
+        public var availableIndicators:ArrayCollection; // of IIndicator
+
+
+        /**
+         * Initialises the dialog.
+         */
+        private function init():void {
+            addEventListener(Event.CLOSE, closeMe);
+        }
+
+
+        /**
+         * Handles the close event for the dialog.
+         */
+        private function closeMe(event:CloseEvent):void {
+            PopUpManager.removePopUp(this);
+        }
+
+
+        /**
+         * Adds the selected indicators in the dialog to the selection
+         * collection and then closes the dialog.
+         */
+        private function addIndicators():void {
+            for each (var indi:EndorsedIndicator in datagridIndicators.selectedItems) {
+                indi.setSelected(true);
+                selectedIndicators.addItem(indi);
+            }
+
+            if (datagridIndicators.selectedItems.length > 0)
+                dispatchEvent(new Event("change"));
+
+            dispatchCloseEvent();
+        }
+
+
+        /**
+         * Adds all indicators in the dialog to the selection and then
+         * closes the dialog.
+         */
+        private function addAllIndicators():void {
+            for each (var indi:EndorsedIndicator in availableIndicators) {
+                indi.setSelected(true);
+                selectedIndicators.addItem(indi);
+            }
+
+            if (availableIndicators.length > 0)
+                dispatchEvent(new Event("change"));
+
+            dispatchCloseEvent();
+        }
+
+
+        /**
+         * Dispatches a close event for the dialog.
+         */
+        private function dispatchCloseEvent():void {
+            dispatchEvent(new CloseEvent(CloseEvent.CLOSE));
+        }
+			
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:VBox
+            width="100%"
+            height="100%"
+            paddingBottom="5"
+            paddingTop="5"
+            paddingLeft="5"
+            paddingRight="5"
+            alpha="0.5"
+            backgroundColor="#ffffff"
+            >
+
+        <mx:Label text="Select all indicators to be added (use the Ctrl and Shift keys to select multiple indicators):"
+                  width="100%"/>
+
+        <mx:DataGrid id="datagridIndicators"
+                     width="100%" height="100%"
+                     dataProvider="{availableIndicators}"
+                     allowMultipleSelection="true"
+                >
+            <mx:columns>
+                <!--
+                    <sc:DataGridColumnNested headerText="Subtheme" dataField="groupSubthemes"
+                        itemRenderer="org.seamless_ip.ui.indicators.ImplementedLabelRenderer"
+                        />
+                    -->
+                <sc:DataGridColumnNested headerText="Name" dataField="label_en" sortable="true"
+                                         itemRenderer="org.seamless_ip.ui.indicators.ImplementedLabelRenderer"
+                        />
+                <sc:DataGridColumnNested headerText="Unit" dataField="unit" sortable="true"
+                                         itemRenderer="org.seamless_ip.ui.indicators.ImplementedLabelRenderer"
+                        />
+                <sc:DataGridColumnNested headerText="Spatial Resolution" dataField="spatialScale.resolution"
+                                         sortable="true"
+                                         itemRenderer="org.seamless_ip.ui.indicators.ImplementedLabelRenderer"
+                        />
+                <mx:DataGridColumn headerText="Status" width="30" editable="false"
+                                   itemRenderer="org.seamless_ip.ui.indicators.EndorsedStateRenderer"
+                        />
+
+                <!--
+                        In this column we put an Info button to let the user open
+                        the properties window for the indicator on the row.
+                    -->
+                <mx:DataGridColumn headerText="" editable="false" width="30">
+                    <mx:itemRenderer>
+                        <mx:Component>
+                            <mx:VBox width="100%" height="100%" horizontalAlign="center" verticalAlign="middle">
+                                <mx:Script>
+									<![CDATA[
+										import mx.core.Application;
+                                    import mx.core.IFlexDisplayObject;
+                                    import mx.managers.PopUpManager;
+
+                                    import org.seamless_ip.services.transferobjects.indi.EndorsedIndicator;
+
+                                    private function showProperties(data:Object):void
+                                    {
+                                        if (data is EndorsedIndicator)
+                                        {
+                                            var dialog:IFlexDisplayObject = PopUpManager.createPopUp(this, IndicatorPropertiesDlg, true);
+                                            IndicatorPropertiesDlg(dialog).indicator = EndorsedIndicator(data);
+                                            dialog.x = (Application.application.width - dialog.width) / 2;
+                                            dialog.y = (Application.application.height - dialog.height) / 3;
+                                        }
+                                    }
+									]]>
+								</mx:Script>
+                                <mx:Button
+                                        styleName="flattenedButton"
+                                        width="16" height="16"
+                                        click="showProperties(data)"
+                                        toolTip="Show more properties of the indicator"
+                                        enabled="true"
+                                        icon="@Embed('/img/icons/seamless-info-up.gif')"
+                                        overIcon="@Embed(source='/img/icons/seamless-info-up-selected.gif')"
+                                        disabledIcon="@Embed(source='/img/icons/seamless-info-disabled.gif')"
+                                        />
+                            </mx:VBox>
+                        </mx:Component>
+                    </mx:itemRenderer>
+                </mx:DataGridColumn>
+
+            </mx:columns>
+        </mx:DataGrid>
+
+        <mx:HBox width="100%" horizontalAlign="center">
+            <mx:Button label="Add Selected" width="130"
+                       styleName="square3D"
+                       click="addIndicators()"
+                       enabled="{datagridIndicators.selectedItems.length > 0}"
+                       icon="@Embed(source='/img/icons/add_obj.gif')"
+                       toolTip="Add all selected indicators to the grid cell"
+                       height="100%"/>
+            <mx:Button label="Add All" width="130"
+                       styleName="square3D"
+                       click="addAllIndicators()"
+                       enabled="{availableIndicators.length > 0}"
+                       icon="@Embed(source='/img/icons/add_obj.gif')"
+                       toolTip="Add all indicators to the grid cell"
+                       height="100%"/>
+            <mx:Button label="Cancel" width="130"
+                       styleName="square3D"
+                       click="dispatchCloseEvent()"
+                       icon="@Embed(source='/img/icons/errorstate.gif')"
+                       toolTip="Close the window without adding the indicators to the grid cell"
+                       height="100%"/>
+        </mx:HBox>
+    </mx:VBox>
+
+</sc:SizeableTitleWindow>

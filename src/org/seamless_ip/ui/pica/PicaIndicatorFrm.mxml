@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: PicaIndicatorFrm.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:TitleWindow height="574"
+    layout="vertical"
+    title="Pica indicator: {picaIndicator.PICaIndicatorGeneral.name}"
+    width="534"
+    xmlns:mx="http://www.adobe.com/2006/mxml"
+    xmlns:ns="org.seamless_ip.ui.common.*"
+    xmlns:ns1="org.seamless_ip.ui.pica.*">
+
+    <mx:Script>
+        <![CDATA[
+            import org.seamless_ip.services.transferobjects.pica.PICASpatialLevel;
+        ]]>
+    </mx:Script>
+
+    <mx:Script>
+        <![CDATA[
+            import mx.controls.ComboBox;
+            import mx.events.FlexEvent;
+            import mx.managers.PopUpManager;
+            import mx.controls.Alert;
+            import org.seamless_ip.services.remoting.RequestProgressEvent;
+            import org.seamless_ip.services.transferobjects.seamproj.User;
+            import mx.collections.ArrayCollection;
+            import org.seamless_ip.services.transferobjects.pica.PICAIndicatorValue;
+            import org.seamless_ip.services.transferobjects.pica.PicaIndicator;
+            private var _picaIndicator:PicaIndicator = null;
+
+            [Bindable] public function set picaIndicator(picaInd:PicaIndicator):void {
+                _picaIndicator = picaInd;
+                if (picaInd.id == null) {
+                    PicaInstCompServiceSingelton.updatePicaIndicator(picaInd);
+                } else {
+                    PicaInstCompServiceSingelton.getPicaIndicatorValues(picaInd.id);
+                }
+            }
+
+            public function get picaIndicator():PicaIndicator {
+                return _picaIndicator;
+            }
+            [Bindable] public var picaIndicatorValues:ArrayCollection = new ArrayCollection();
+            /* public function set picaIndicatorValues(piv:ArrayCollection):void {
+               _picaIndicatorValues = piv;
+               }
+               public function get picaIndicatorValues():ArrayCollection {
+               return _picaIndicatorValues;
+               }
+             */
+            [Bindable]
+            public var picaSpatialLevel:ArrayCollection = null;
+            private var _pIC:PicaInstCompService = null;
+            private var user:User = null;
+
+            public function get PicaInstCompServiceSingelton():PicaInstCompService {
+                if (_pIC == null) {
+                    _pIC = new PicaInstCompService(user);
+                    _pIC.addEventListener(PicaNewIndicatorValueEvent.UPDATEPICAINDICATORVALUECOMPLETE, RequestUpdatePicaIndicatorValue);
+                    _pIC.addEventListener(PicaInstCompEvent.GETPICAINDICATORVALUESCOMPLETE, RequestGetPicaindIcatorValues);
+                    _pIC.addEventListener(PicaInstCompEvent.UPDATEPICAINDICATORCOMPLETE, RequestUpdatePicaIndicatorComplete);
+                    // Request fail
+                    _pIC.addEventListener(RequestProgressEvent.REQUEST_FAILED, RequestFailed);
+                }
+                return _pIC;
+            }
+
+            public function RequestUpdatePicaIndicatorComplete(event:PicaInstCompEvent):void {
+                picaIndicator = PicaInstCompServiceSingelton.picaIndicator;
+                PicaInstCompServiceSingelton.getPicaIndicatorValues(picaIndicator.id);
+            }
+
+            public function RequestGetPicaindIcatorValues(event:PicaInstCompEvent):void {
+                picaIndicatorValues = PicaInstCompServiceSingelton.picaIndicatorValues;
+            }
+
+            public function RequestUpdatePicaIndicatorValue(event:PicaNewIndicatorValueEvent):void {
+                picaIndicatorValues.addItem(event.picaIndicatorValue);
+            }
+
+            public function RequestFailed(event:RequestProgressEvent):void {
+                Alert.show(event.message);
+            }
+
+            public function onDelete(avEven:Event, avData:Object):void {
+                for (var i:int = 0; i < picaIndicatorValues.length; i++) {
+                    if ((avData as PICAIndicatorValue) == picaIndicatorValues[i]) {
+                        picaIndicatorValues.removeItemAt(i);
+                        break;
+                    }
+                }
+            }
+            public function onEdit(avEven:Event, avData:Object):void {
+
+            }
+
+            public function addNewIndicatorValue(avEven:Event, avData:Object):void {
+                var pIv:PICAIndicatorValue = new PICAIndicatorValue();
+                pIv.assessmentLevelPICAIndicator = "0";
+                pIv.picaIndicator = picaIndicator;
+                pIv.value = 0;
+                try {
+                pIv.picaSpatialLevel = (PICASpatialLevel)(picaSpatialLevel.getItemAt(0));
+                } catch (e:Error) {}
+                PicaInstCompServiceSingelton.updatePicaIndicatorValue(pIv);
+            }
+
+            private function close():void {
+                PopUpManager.removePopUp(this);
+            }
+
+            private function save():void {
+                picaIndicator.dataSource = txtDataSource.text;
+                picaIndicator.dataSourceSpecification = txtDataSourceSpecification.text;
+                picaIndicator.description = txtDescription.text;
+                picaIndicator.geographicalScope = txtGeographicalScope.text;
+                picaIndicator.specificLinkage = txtSpecificLinkage.text;
+                PicaInstCompServiceSingelton.updatePicaIndicator(picaIndicator);
+                for each (var p:PICAIndicatorValue  in picaIndicatorValues) {
+                	Alert.show(p.picaSpatialLevel.id);
+                }
+                PicaInstCompServiceSingelton.updatePicaIndicatorValues(picaIndicatorValues, picaIndicator.id);
+                close();
+            }
+
+            public function indicatorComboBox(event:FlexEvent):void {
+                if (event != null) {
+                    ComboBox(event.target).dataProvider =  picaSpatialLevel;
+                }
+            }
+
+            private function removeThisFunction(item:Object, column:DataGridColumn):String {
+                return (PICAIndicatorValue)(item).picaSpatialLevel.id;
+            }
+
+            private function doSomething():void {
+            	Alert.show("Something");
+            }
+        ]]>
+    </mx:Script>
+    <mx:Accordion height="489"
+        width="100%">
+        <mx:Form height="100%"
+            label="Indicator"
+            width="100%">
+            <mx:FormItem label="Source"
+                width="100%">
+                <mx:TextArea height="20"
+                    id="txtDataSource"
+                    text="{picaIndicator.dataSource}"
+                    width="100%"/>
+            </mx:FormItem>
+            <mx:FormItem label="Source specification"
+                width="100%">
+                <mx:TextArea height="100"
+                    id="txtDataSourceSpecification"
+                    text="{picaIndicator.dataSourceSpecification}"
+                    width="100%"/>
+            </mx:FormItem>
+            <mx:FormItem label="Description"
+                width="100%">
+                <mx:TextArea height="100"
+                    id="txtDescription"
+                    text="{picaIndicator.description}"
+                    width="100%"/>
+            </mx:FormItem>
+            <mx:FormItem label="Geographical scope"
+                width="100%">
+                <mx:TextArea height="20"
+                    id="txtGeographicalScope"
+                    text="{picaIndicator.geographicalScope}"
+                    width="100%"/>
+            </mx:FormItem>
+            <mx:FormItem label="Specific linkage"
+                width="100%">
+                <mx:TextArea height="20"
+                    id="txtSpecificLinkage"
+                    text="{picaIndicator.specificLinkage}"
+                    width="100%"/>
+            </mx:FormItem>
+        </mx:Form>
+        <mx:Panel height="100%"
+            label="Indicator values"
+            layout="vertical"
+            width="100%">
+            <ns:DataGridRowColor dataProvider="{picaIndicatorValues}"
+                editable="false"
+                height="100%"
+                id="gridIndicatorValues"
+                width="100%"
+                >
+                <ns:columns>
+                    <mx:DataGridColumn dataField="assessmentLevelPICAIndicator"
+                        headerText="Level"/>
+                    <mx:DataGridColumn dataField="picaSpatialLevel"
+                        editable="false"
+                        headerText="Spatial level">
+                   <!--     <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:ComboBox editable="false"
+                                    dataProvider="{outerDocument.picaSpatialLevel}"
+                                    labelField="name">
+                                </mx:ComboBox>
+                            </mx:Component>
+                        </mx:itemRenderer> -->
+                    </mx:DataGridColumn>
+
+                    <mx:DataGridColumn dataField="value"
+                        headerText="Value"/>
+                         <mx:DataGridColumn editable="false"
+                        width="80">
+                        <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:HBox>
+                                    <mx:Button click="outerDocument.onEdit( event, data )"
+                                        label="Edit"/>
+                                </mx:HBox>
+                            </mx:Component>
+                        </mx:itemRenderer>
+                    </mx:DataGridColumn>
+                    <mx:DataGridColumn editable="false"
+                        width="80">
+                        <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:HBox>
+                                    <mx:Button click="outerDocument.onDelete( event, data )"
+                                        label="Delete"/>
+                                </mx:HBox>
+                            </mx:Component>
+                        </mx:itemRenderer>
+                    </mx:DataGridColumn>
+                </ns:columns>
+            </ns:DataGridRowColor>
+            <mx:HBox horizontalAlign="right"
+                verticalAlign="bottom"
+                width="100%">
+                <mx:Button click="{addNewIndicatorValue(event, data)}"
+                    disabledIcon="@Embed('/img/icons/add_obj.gif')"
+                    enabled="true"
+                    icon="@Embed('/img/icons/add_obj.gif')"
+                    label="Add new"
+                    toolTip=""/>
+            </mx:HBox>
+        </mx:Panel>
+    </mx:Accordion>
+    <mx:FormItem>
+        <mx:HBox horizontalAlign="right"
+            verticalAlign="bottom"
+            width="100%">
+            <mx:Spacer width="100%"/>
+            <mx:Button click="{close()}"
+                disabledIcon="@Embed('/img/icons/delete_edit_d.gif')"
+                icon="@Embed('/img/icons/delete_edit.gif')"
+                label="Discard"
+                toolTip="Discard all changes"/>
+            <mx:Button click="{save()}"
+                disabledIcon="@Embed('/img/icons/save_edit_d.gif')"
+                icon="@Embed('/img/icons/save_edit.gif')"
+                id="btnSave"
+                label="Save"
+                toolTip="Save all changes"/>
+        </mx:HBox>
+    </mx:FormItem>
+</mx:TitleWindow>

@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: ExperimentSelector.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+           width="100%" height="100%">
+
+    <mx:Metadata>
+        [Event(name="change")]
+    </mx:Metadata>
+
+    <!--
+        A Seam:PRESS component that displays information about experiments and
+        allows the user to select from them.
+
+        @author Rob Knapen
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.events.ValidationResultEvent;
+
+        import org.seamless_ip.services.transferobjects.seamproj.Experiment;
+
+        [Bindable]
+        public var allowMultiSelect:Boolean = true;
+        [Bindable]
+        public var title:String = "Select Experiment(s)";
+
+        [Bindable]
+        private var _sourceExperiments:ArrayCollection;
+        [Bindable]
+        private var _displayedExperiments:ArrayCollection = new ArrayCollection();
+        [Bindable]
+        private var _baselines:ArrayCollection = new ArrayCollection();
+
+
+        public function set experiments(experiments:ArrayCollection):void {
+            _sourceExperiments = experiments;
+            updateFilters();
+            applyFilters();
+        }
+
+        public function get experiments():ArrayCollection {
+            return _sourceExperiments;
+        }
+
+        /**
+         * Updates the data providers for the spatial and temporal scales
+         * comboboxes based on the scales available from the indicators.
+         */
+        private function updateFilters():void {
+            _baselines.removeAll();
+
+            if (_sourceExperiments != null) {
+                for each (var exp:Experiment in _sourceExperiments) {
+                    addBaseline(exp.baselineid, exp.baselinetitle);
+                }
+            }
+        }
+
+        /**
+         * Adds the baseline to the list, avoiding duplicates.
+         */
+        private function addBaseline(id:String, title:String):void {
+            if ((id != null) && (title != null)) {
+                for each (var obj:Object in _baselines) {
+                    if (obj.id == id)
+                        return;
+                }
+                var newObj:Object = new Object();
+                newObj.id = id;
+                newObj.label = title;
+                _baselines.addItem(newObj);
+            }
+        }
+
+
+        /**
+         * Filters the displayed list of experiments based on the
+         * selection in the filter comboboxes. It clears the current
+         * list selection.
+         */
+        private function applyFilters():void {
+            // clear old data
+            _displayedExperiments.removeAll();
+
+            // get the filter values
+            var baseline:Object = comboBoxBaseline.selectedItem;
+
+            // fill the display list by filtering the source list
+            if ((_sourceExperiments != null) && (baseline != null)) {
+                for each (var exp:Experiment in _sourceExperiments) {
+                    if (exp.baselineid == baseline.id) {
+                        _displayedExperiments.addItem(exp);
+                    }
+                }
+            }
+        }
+
+        /**
+         * Clears the current selection of items.
+         */
+        public function clearSelection():void {
+            experimentInput.text = "";
+            dataGrid.selectedItems = null;
+        }
+
+        /**
+         * Sets the current selection based on the specified ids.
+         */
+        public function updateSelection(baselineId:String, selectedIds:ArrayCollection):void {
+            experimentInput.text = "";
+
+            // use the text box input to select experiments outside the project
+            if (!allInTable(selectedIds)) {
+                experimentInput.text = createSelectedText(selectedIds);
+            }
+            else {
+                var selection:ArrayCollection = new ArrayCollection();
+                for each (var obj:Object in _sourceExperiments) {
+                    for each (var id:String in selectedIds) {
+                        if (obj.id == id) {
+                            selection.addItem(obj);
+                            break;
+                        }
+                    }
+                }
+                dataGrid.selectedItems = selection.toArray();
+            }
+
+            // set filter combobox
+            for each (var baseline:Object in _baselines) {
+                if (baseline.id == baselineId) {
+                    comboBoxBaseline.selectedItem = baseline;
+                    break;
+                }
+            }
+        }
+
+
+        /**
+         * Gets the list of ids of the currently selected items.
+         */
+        public function getSelectedIds():ArrayCollection {
+            var result:ArrayCollection = new ArrayCollection();
+            // text input box overrules table selection
+            if ((experimentInput.text != null) && (experimentInput.text.length > 0)) {
+                var r:ValidationResultEvent = experimentInputValidator.validate(null, true);
+                if ((r != null) && (r.type == ValidationResultEvent.VALID))
+                    result = new ArrayCollection(experimentInput.text.split(","));
+                // TODO check if all selected match the filters?
+            }
+            else {
+                for each (var item:Object in dataGrid.selectedItems)
+                    result.addItem(item.id);
+            }
+            return result;
+        }
+
+
+        /**
+         * Gets the currently selected baseline experiment id.
+         */
+        public function getSelectedBaselineId():String {
+            var baseline:Object = comboBoxBaseline.selectedItem;
+            if (baseline != null)
+                return baseline.id;
+            else
+                return null;
+        }
+
+
+        /**
+         * Gets the currently selected baseline experiment id.
+         */
+        public function getSelectedBaselineTitle():String {
+            var baseline:Object = comboBoxBaseline.selectedItem;
+            if (baseline != null)
+                return baseline.label;
+            else
+                return null;
+        }
+
+
+        /**
+         * Handles change notifications from the cells.
+         */
+        private function changed(event:Event):void {
+            dispatchEvent(new Event("change"));
+        }
+
+
+        /**
+         * Checks if all the specified ids refer to experiments that can
+         * be selected from the table.
+         */
+        private function allInTable(ids:ArrayCollection):Boolean {
+            var found:Boolean;
+            for each (var id:String in ids) {
+                found = false;
+                for each (var obj:Object in _sourceExperiments) {
+                    if (obj.id == id) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                    return false;
+            }
+            return true;
+        }
+
+
+        /**
+         * Create a text string with a list of ids, seperated by a ",".
+         */
+        private function createSelectedText(ids:ArrayCollection):String {
+            var result:String = "";
+            for each (var id:String in ids) {
+                if (result.length > 0)
+                    result += ",";
+                result += id;
+            }
+            return result;
+        }
+			
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Validators
+     ===========================================================================
+     -->
+
+    <mx:RegExpValidator id="experimentInputValidator"
+                        source="{experimentInput}" property="text"
+                        flags="g" expression="^\d+[,\d+]*$"
+                        noMatchError="Please enter experiment number(s), separated by commas."
+            />
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:HBox
+            width="100%"
+            height="100%"
+            >
+
+        <!-- left margin text with some explaination -->
+        <mx:TextArea width="100" height="100%"
+                     editable="false" enabled="true" wordWrap="true" backgroundAlpha="0.0">
+            <mx:text>Select the experiment(s) to display the calculated values for. The system checks which experiment
+                has been calculated and will only make those selectable. For the greyed out experiments no calculation
+                has been run.
+            </mx:text>
+        </mx:TextArea>
+
+        <!-- center container with inputs -->
+        <mx:VBox
+                width="100%"
+                height="100%"
+                paddingBottom="10" paddingTop="5"
+                paddingLeft="10" paddingRight="10">
+
+            <!-- comboboxes to filter on properties -->
+            <mx:Label width="100%" text="Selected experiments must share the same baseline:"/>
+            <mx:HBox width="100%" verticalAlign="middle">
+                <mx:Label width="100" text="Baseline:" textAlign="right"/>
+                <mx:ComboBox id="comboBoxBaseline" width="100%"
+                             dataProvider="{_baselines}"
+                             change="applyFilters()"/>
+            </mx:HBox>
+
+            <!-- table with all matching experiments -->
+            <mx:DataGrid id="dataGrid"
+                         dataProvider="{_displayedExperiments}"
+                         change="changed(event)"
+                         allowMultipleSelection="{allowMultiSelect}"
+                         width="100%"
+                         height="100%"
+                    >
+                <mx:columns>
+                    <mx:DataGridColumn headerText="ID" dataField="id" width="50"
+                                       itemRenderer="org.seamless_ip.ui.seampress.ExperimentItemRenderer"
+                            />
+                    <mx:DataGridColumn headerText="State" dataField="state" width="100"
+                                       itemRenderer="org.seamless_ip.ui.seampress.ExperimentItemRenderer"
+                            />
+                    <mx:DataGridColumn headerText="Title" dataField="title"
+                                       itemRenderer="org.seamless_ip.ui.seampress.ExperimentItemRenderer"
+                            />
+                </mx:columns>
+            </mx:DataGrid>
+
+            <mx:HBox width="100%" verticalAlign="middle">
+                <mx:Label text="Use the Ctrl or Shift keys to select multiple items."
+                          width="100%"
+                          enabled="false"
+                          visible="{allowMultiSelect}"
+                        />
+                <mx:Spacer width="100%" height="100%"
+                           visible="{allowMultiSelect}"
+                        />
+                <mx:Label text="Experiments:" enabled="false"/>
+                <mx:TextInput id="experimentInput" width="100%"
+                              focusOut="changed(event)"
+                        />
+            </mx:HBox>
+
+        </mx:VBox>
+    </mx:HBox>
+
+</mx:Canvas>

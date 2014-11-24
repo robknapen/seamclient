@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: LoginView.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+           width="100%" height="100%"
+           creationComplete="init()"
+        >
+
+    <mx:Metadata>
+        [Event(name="userLoggedIn", type="org.seamless_ip.ui.login.UserLoggedInEvent")]
+    </mx:Metadata>
+
+
+    <!--
+    Main window of the user interface for SEAMLESS-IF.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import org.seamless_ip.services.remoting.RequestProgressEvent;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        static private const MSG_START:String =
+                "Please provide your account information:";
+        static private const MSG_WAIT:String =
+                "Please wait, validating your credentials...";
+        static private const MSG_DENIED:String =
+                "Access denied, invalid account!";
+        static private const MSG_SERVER_PROBLEM:String =
+                "Failed to connect to the SEAMLESS server";
+        static private const MSG_HOST_PROBLEM:String =
+                "Make sure that your internet connection and the server are available";
+        static private const MSG_JDBC_PROBLEM:String =
+                "The server might need to be restarted, please call for help!";
+        static private const MSG_WELCOME:String =
+                "Access granted, welcome "; // + name + "!"
+
+        static private const COLOR_STD:int = 0x0000000;
+        static private const COLOR_GOOD:int = 0x0008000;
+        static private const COLOR_BAD:int = 0xFF0000;
+
+        [Bindable]
+        private var _credentialsSrv:CredentialsServices;
+
+
+        public function init():void
+        {
+            updateMessage(MSG_START, COLOR_STD);
+
+            _credentialsSrv = new CredentialsServices();
+            _credentialsSrv.registerForEvents(requestProgressEventHandler);
+        }
+
+
+        /**
+         * Clears the fields in the login form.
+         */
+        private function clearLogin():void
+        {
+            inputUserName.text = "";
+            inputPassword.text = "";
+            labelMessage.text = MSG_START;
+            textAreaErrorMessage.text = "";
+        }
+
+
+        private function updateMessage(msg:String, color:int):void
+        {
+            labelMessage.text = msg;
+            textAreaErrorMessage.text = "";
+            labelMessage.setStyle("color", color);
+        }
+
+
+        private function validateCredentials():void
+        {
+            // validate input
+            if ((inputUserName.text.length > 0) && (inputPassword.text.length > 0))
+            {
+                buttonLogin.enabled = false;
+                inputUserName.enabled = false;
+                inputPassword.enabled = false;
+
+                updateMessage(MSG_WAIT, COLOR_STD);
+
+                _credentialsSrv.authenticate(inputUserName.text, inputPassword.text);
+            }
+        }
+
+
+        private function translateError(message:String):String
+        {
+            // it is not rocket science, but might help the non-geeks amongst us
+
+            if (message.indexOf("JDBC") > -1)
+            {
+                return MSG_JDBC_PROBLEM + "\n(" + message + ")";
+            }
+
+            if (message.indexOf("HTTP") > -1)
+            {
+                return MSG_HOST_PROBLEM + "\n(" + message + ")";
+            }
+
+            return message;
+        }
+
+
+        private function requestProgressEventHandler(event:RequestProgressEvent):void
+        {
+            var enable:Boolean = false;
+
+            if (event.type == RequestProgressEvent.REQUEST_FAILED)
+            {
+                updateMessage(MSG_SERVER_PROBLEM, COLOR_BAD);
+                textAreaErrorMessage.text = translateError(event.message);
+                enable = true;
+            }
+
+            if (event.type == RequestProgressEvent.REQUEST_COMPLETED)
+            {
+                enable = true;
+                if (_credentialsSrv.users.length > 0)
+                {
+                    var user:User = _credentialsSrv.users[0];
+
+                    if (user != null)
+                    {
+                        var name:String = user.firstName;
+
+                        if ((name == null) || (name.length == 0))
+                            name = user.accountName;
+
+                        updateMessage(MSG_WELCOME + name + "!", COLOR_GOOD);
+                        clearLogin();
+
+                        // dispatch the login event
+                        dispatchEvent(new UserLoggedInEvent(user));
+                    }
+                }
+                else
+                {
+                    updateMessage(MSG_DENIED, COLOR_BAD);
+                }
+            }
+
+            if (enable)
+            {
+                buttonLogin.enabled = true;
+                inputUserName.enabled = true;
+                inputPassword.enabled = true;
+            }
+        }
+			
+		]]>
+	</mx:Script>
+
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:VBox
+            width="100%"
+            height="100%"
+            horizontalAlign="center"
+            >
+
+        <mx:Spacer height="60%" width="100%"/>
+
+        <mx:HBox width="100%" horizontalAlign="center" verticalAlign="middle">
+
+            <mx:Grid defaultButton="{buttonLogin}">
+                <mx:GridRow width="100%" height="100%">
+                    <mx:GridItem width="100%" height="100%" colSpan="2">
+                        <mx:Image
+			                height="119"
+			                width="300"
+			                source="@Embed('/img/logo/seamless-full-reflection.png')"
+			                scaleContent="false"
+			                horizontalCenter="0"/>
+                    </mx:GridItem>
+                </mx:GridRow>
+
+                <mx:GridRow width="100%" height="100%">
+                    <mx:GridItem width="100%" height="100%" colSpan="2">
+                        <mx:Label id="labelMessage"
+                                  width="100%"
+                                  text="{MSG_START}"
+                                  textAlign="left"
+                                  fontWeight="normal"
+                                  truncateToFit="true" maxWidth="300"/>
+                    </mx:GridItem>
+                </mx:GridRow>
+
+                <mx:GridRow width="100%" height="100%">
+                    <mx:GridItem height="100%">
+                        <mx:Label text="Username:"/>
+                    </mx:GridItem>
+                    <mx:GridItem width="100%" height="100%">
+                        <mx:TextInput id="inputUserName"
+                                      width="100%"
+                                />
+                    </mx:GridItem>
+                </mx:GridRow>
+                <mx:GridRow width="100%" height="100%">
+                    <mx:GridItem height="100%">
+                        <mx:Label text="Password:"/>
+                    </mx:GridItem>
+                    <mx:GridItem width="100%" height="100%">
+                        <mx:TextInput id="inputPassword"
+                                      width="100%"
+                                      displayAsPassword="true"
+                                />
+                    </mx:GridItem>
+                </mx:GridRow>
+                <mx:GridRow width="100%" height="100%">
+                    <mx:GridItem height="100%">
+                    </mx:GridItem>
+                    <mx:GridItem width="100%" height="100%" horizontalAlign="right" verticalAlign="bottom">
+                        <mx:LinkButton id="buttonLogin"
+                                       label="Log in"
+                                       toolTip="Log in"
+                                       enabled="true"
+                                       click="validateCredentials()"
+                                />
+                    </mx:GridItem>
+                </mx:GridRow>
+
+            </mx:Grid>
+
+        </mx:HBox>
+
+        <mx:Spacer width="100%" height="30%"/>
+
+        <mx:HBox width="100%" horizontalAlign="center">
+            <mx:TextArea id="textAreaErrorMessage"
+                         width="80%"
+                         wordWrap="true"
+                         borderStyle="none"
+                         backgroundAlpha="0.0"
+                         editable="false" textAlign="center"/>
+        </mx:HBox>
+
+        <mx:Spacer width="100%" height="60%"/>
+
+        <mx:Label text="This work has been carried out as part of the SEAMLESS Integrated Framework" width="100%"
+                  textAlign="center" color="#ACB1B2"/>
+        <mx:Label text="project, EU 6th Framework Programme, contract no. 010036-2 and/or as part of" width="100%" textAlign="center"
+                  color="#ACB1B2"/>
+        <mx:Label text="the SEAMLESS association. For more information: www.seamlessassociation.org." width="100%" textAlign="center"
+                  color="#ACB1B2"/>
+    </mx:VBox>
+
+</mx:Canvas>

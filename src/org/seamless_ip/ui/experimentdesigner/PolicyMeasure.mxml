@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: PolicyMeasure.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="100%" title="Create new policy measure"
+          creationComplete="{fillNuts();}">
+    <mx:Script>
+	<![CDATA[
+		import mx.collections.ArrayCollection;
+        import mx.collections.Sort;
+        import mx.collections.SortField;
+
+        import org.seamless_ip.services.remoting.RequestProgressEvent;
+        import org.seamless_ip.services.transferobjects.farm.NUTSregion;
+        import org.seamless_ip.services.transferobjects.farmopt.Penalty;
+        import org.seamless_ip.services.transferobjects.farmopt.SubsidyCrossCompliance;
+        import org.seamless_ip.services.transferobjects.farmopt.Tax;
+
+        [Bindable]
+        public var myPolicyMeasures:ArrayCollection;
+
+        private function discardBtnPress(data:Object):void
+        {
+
+
+        }
+
+        private function saveBtnPress(data:Object):void
+        {
+            if (cmbRule.selectedLabel == "Tax") {
+                var tax:Tax = new Tax();
+                tax.erosion = 0;
+                tax.irrigationWaterAvailability = 0;
+                tax.nitrateleaching = 0;
+                tax.nitrogenUse = 0;
+                tax.nitrogenUseOrganic = 0;
+                tax.pesticidePressure = 0;
+                tax.ruleLevel = 0;
+                tax.soilOrganicMatter = 0;
+                tax.minimum = true;
+                tax.NUTSRegion = cmdNuts.selectedItem as NUTSregion;
+                myPolicyMeasures.addItem(tax);
+            } else if (cmbRule.selectedLabel == "Subsidy") {
+                var subsidy:SubsidyCrossCompliance = new SubsidyCrossCompliance();
+                subsidy.erosion = 0;
+                subsidy.irrigationWaterAvailability = 0;
+                subsidy.nitrateleaching = 0;
+                subsidy.nitrogenUse = 0;
+                subsidy.nitrogenUseOrganic = 0;
+                subsidy.pesticidePressure = 0;
+                subsidy.ruleLevel = 0;
+                subsidy.soilOrganicMatter = 0;
+                subsidy.minimum = true;
+                subsidy.NUTSRegion = cmdNuts.selectedItem as NUTSregion;
+                myPolicyMeasures.addItem(subsidy);
+            } else if (cmbRule.selectedLabel == "Penalty") {
+                var penalty:Penalty = new Penalty();
+                penalty.erosion = 0;
+                penalty.irrigationWaterAvailability = 0;
+                penalty.nitrateleaching = 0;
+                penalty.nitrogenUse = 0;
+                penalty.nitrogenUseOrganic = 0;
+                penalty.pesticidePressure = 0;
+                penalty.ruleLevel = 0;
+                penalty.soilOrganicMatter = 0;
+                penalty.minimum = true;
+                penalty.NUTSRegion = cmdNuts.selectedItem as NUTSregion;
+                myPolicyMeasures.addItem(penalty);
+            }
+
+        }
+
+        [Bindable]
+        private var _policyService:PolicyService;
+
+        public function get PolicyServiceSingelton():PolicyService
+        {
+            if (_policyService == null) {
+                _policyService = new PolicyService();
+                _policyService.addEventListener(RequestProgressEvent.REQUEST_SEND, RequestSend);
+                _policyService.addEventListener(RequestProgressEvent.REQUEST_COMPLETED, RequestCompleted);
+            }
+            return _policyService;
+        }
+
+        public function RequestSend(event:RequestProgressEvent):void {
+
+        }
+
+        public function RequestCompleted(event:RequestProgressEvent):void {
+            dgNuts = PolicyServiceSingelton.nutsRegions;
+            var sort:Sort = new Sort();
+            var sortField:SortField = new SortField();
+            sortField.numeric = false;
+            sortField.name = "name";
+            sort.fields = [sortField];
+            dgNuts.sort = sort;
+            dgNuts.refresh();
+        }
+
+
+        private function fillNuts():void {
+            // Alert.show("I'm skiing... I will fix this in Copenhagen! Benny");
+            PolicyServiceSingelton.getAllNutsRegions();
+        }
+
+        [Bindable]
+        public var dgNuts:ArrayCollection;
+		
+	]]>
+</mx:Script>
+    <mx:Form width="100%">
+        <mx:FormItem label="Region">
+            <mx:ComboBox enabled="true" id="cmdNuts" dataProvider="{dgNuts}" labelField="name" text="Select region"
+                    ></mx:ComboBox>
+        </mx:FormItem>
+        <mx:FormItem label="Rule">
+            <mx:ComboBox id="cmbRule" text="Select rule">
+                <mx:dataProvider>
+                    <mx:Array>
+                        <mx:String>Penalty</mx:String>
+                        <mx:String>Subsidy</mx:String>
+                        <mx:String>Tax</mx:String>
+                    </mx:Array>
+                </mx:dataProvider>
+            </mx:ComboBox>
+        </mx:FormItem>
+    </mx:Form>
+    <mx:HBox width="100%" horizontalAlign="right">
+        <mx:Button label="Add"
+                   id="btnAdd"
+
+                   toolTip="Add"
+                   click="saveBtnPress(event)"
+                   disabledIcon="@Embed('/img/icons/add_obj_d.gif')"
+                   icon="@Embed('/img/icons/add_obj.gif')"/>
+    </mx:HBox>
+
+</mx:Panel>

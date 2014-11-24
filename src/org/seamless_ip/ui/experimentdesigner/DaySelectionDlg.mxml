@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: DaySelectionDlg.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+                showCloseButton="true"
+                borderAlpha="1.0"
+                creationComplete="addEventListener( CloseEvent.CLOSE, closeMe );"
+                title="Select the day of the year">
+    <mx:Script>
+		<![CDATA[
+		import mx.events.CloseEvent;
+        import mx.managers.PopUpManager;
+
+        public static var MODE_NORANGE: String = "No validation is performed";
+        public static var MODE_RANGESTART: String = "Range: disable days after @Offset";
+        public static var MODE_RANGEEND: String = "Range: disable days before @Offset";
+
+        private var _mode: String = MODE_NORANGE;
+
+        /**
+         * Dialog to choose a day of a year.
+         */
+        public function set Mode(mode: String):void {
+            if (mode != MODE_NORANGE)
+            {
+                if (mode == MODE_RANGESTART)
+                    datechooser.disabledRanges = [
+                        {
+                            rangeStart: NumberToDate(_offset)
+                        }
+                    ];
+                else if (mode == MODE_RANGEEND)
+                    datechooser.disabledRanges = [
+                        {
+                            rangeEnd: NumberToDate(_offset)
+                        }
+                    ];
+            }
+            _mode = mode;
+        }
+
+        private var _offset: Number;
+
+        public function set Offset(offset: Number):void {
+            _offset = offset;
+        }
+
+
+        [Bindable]
+        private var _selecteddayoftheyear: Number;
+
+        public function get Selecteddayoftheyear():Number {
+            _selecteddayoftheyear = DateToNumber(datechooser.selectedDate);
+            return _selecteddayoftheyear;
+        }
+
+        public function set Selecteddayoftheyear(selecteddayoftheyear: Number):void {
+            _selecteddayoftheyear = selecteddayoftheyear;
+            datechooser.selectedDate = NumberToDate(selecteddayoftheyear);
+        }
+
+
+        private var _today: Date;
+
+        private function get Today():Date {
+            if (_today == null)
+            {
+                _today = new Date();
+                _today.setHours(0, 0, 0, 0);
+            }
+            return _today;
+        }
+
+        private var _firstdayofcurrentyear: Date;
+
+        private function get Firstdayofcurrentyear():Date {
+            if (_firstdayofcurrentyear == null)
+            {
+                _firstdayofcurrentyear = new Date();
+                _firstdayofcurrentyear.setFullYear(Today.getUTCFullYear(), 0/*month 0-11*/, 1/*day*/);
+                _firstdayofcurrentyear.setHours(0, 0, 0, 0);
+            }
+            return _firstdayofcurrentyear;
+        }
+
+        private function closeMe(event:CloseEvent):void {
+            PopUpManager.removePopUp(this);
+        }
+
+        private function selectClick(event:MouseEvent):void {
+            this.dispatchEvent(new Event(Event.COMPLETE));
+        }
+
+        private function discardClick(event:MouseEvent):void {
+            this.dispatchEvent(new CloseEvent(CloseEvent.CLOSE));
+        }
+
+        /* public function NumberToDate(dayoftheyear:Number):Date
+         *
+         * @dayoftheyear number of day to be converted in date
+         * return the date represented by the number
+         *
+         * Note: computation are done in respect the current year!!!
+         *
+         * Sample:
+         * 2 will return 02.01.2009
+         * 32 will return 01.02.2009
+         */
+        private function NumberToDate(dayoftheyear:Number):Date {
+            var result:Number = Firstdayofcurrentyear.valueOf() + (dayoftheyear - 1/*@dayoftheyear have value  1-365...we have to subtract 1 to let it be e.g. the "1" as 01.01.2009 instead of 02.01.2009!!!*/) * (24 * 60 * 60 * 1000/*millisecond in one day*/);
+            return new Date(result);
+        }
+
+        /* public function DateToNumber(selecteddate:Date):Number
+         *
+         * @selecteddate date to be converted in number
+         * return the number of the day inside the year
+         *
+         * Note: computation are done in respect the current year!!!
+         *
+         * Sample:
+         * 02.01.2009 will return 2
+         * 01.02.2009 will return 32
+         */
+        private function DateToNumber(selecteddate:Date):Number {
+            var value: Number = selecteddate.valueOf();//Returns the number of milliseconds since midnight January 1, 1970, universal time, for a Date object.
+            var result: Number = (value - Firstdayofcurrentyear.valueOf()) / (24 * 60 * 60 * 1000) + 1/*millisecond in one day*/;
+            //if @result is e.g. 267.98 we have to approximate it to 268
+            return new Number(result.toFixed(0));
+        }
+		]]>
+	</mx:Script>
+
+    <mx:VBox>
+        <mx:DateChooser id="datechooser"
+                        maxYear="{Today.getUTCFullYear()}"
+                        minYear="{Today.getUTCFullYear()}"/>
+
+        <mx:HBox width="100%" height="100%" horizontalAlign="center">
+            <mx:Button label="Select" click="selectClick(event)"/>
+            <mx:Button label="Discard" click="discardClick(event)"/>
+        </mx:HBox>
+    </mx:VBox>
+</mx:TitleWindow>

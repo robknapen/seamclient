@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: IndicatorRenderer.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:VBox
+        xmlns:mx="http://www.adobe.com/2006/mxml"
+        borderStyle="solid"
+        cornerRadius="5"
+        backgroundColor="{getColor(data)}"
+        verticalGap="0"
+        horizontalScrollPolicy="off"
+        verticalScrollPolicy="off"
+        toolTip="{data.description}"
+        paddingBottom="5" paddingTop="5">
+
+    <!--
+	Item renderer to display some information from an IndicatorModel instance
+	into a list.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+
+        import org.seamless_ip.services.transferobjects.indi.IIndicator;
+        import org.seamless_ip.services.transferobjects.indi.Subtheme;
+
+        /**
+         * Returns a colour for the displayed object. When the object
+         * is an IIndicator that returns true for isImplemented(), the
+         * returned colour will be green. Otherwise it will be light
+         * grey.
+         */
+        private function getColor(data:Object):uint {
+            if (data is IIndicator) {
+                if (IIndicator(data).isImplemented())
+                    return 0xECF7DE; // greenish
+            }
+            return 0xFEFEFE; // greyed out
+        }
+
+
+        /**
+         * Returns a label by concatenating all label_en properties of
+         * the specified subthemes.
+         */
+        private function subthemesLabel(subthemes:ArrayCollection):String {
+            var txt:String = "";
+            for each (var st:Subtheme in subthemes) {
+                if (txt.length > 0)
+                    txt = txt + "-";
+                txt = txt + st.label_en;
+            }
+            return txt;
+        }
+			
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:Label text="{data.label_en}"
+              width="100%"
+              textAlign="left"
+              color="#000000"
+              fontWeight="bold"
+              fontFamily="Arial"
+              toolTip="{data.description}"
+            />
+    <mx:Label text="{subthemesLabel(data.groupSubthemes)}"
+              width="100%"
+              textAlign="left"
+              color="#000000"
+              fontWeight="normal"
+              fontFamily="Arial"
+              fontSize="9"
+            />
+
+</mx:VBox>

@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: compositionComponent.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:vis="flare.vis.*"
+	width="100%" height="100%" backgroundColor="#FEFFFF" backgroundAlpha="0.99">
+
+	<mx:Script>
+		<![CDATA[
+			import flare.display.TextSprite;
+			import mx.effects.easing.Back;
+			import flare.vis.axis.Axis;
+			import flare.vis.axis.AxisGridLine;
+			import mx.core.IToolTip;
+			import mx.messaging.channels.StreamingAMFChannel;
+			import mx.controls.ToolTip;
+			import mx.managers.ToolTipManager;
+			import flare.vis.data.render.ArrowType;
+			import flare.vis.data.render.IRenderer;
+			import mx.controls.Button;
+			import flare.util.Shapes;
+			import flare.vis.data.DataSprite;
+			import flare.vis.data.ScaleBinding;
+			import mx.controls.Alert;
+			import flare.vis.data.EdgeSprite;
+			import flare.vis.operator.label.Labeler;
+			import flare.scale.Scale;
+			import flare.scale.OrdinalScale;
+			import flare.scale.ScaleType;
+			import mx.core.UIComponent;
+			import flare.vis.Visualization;
+			import flare.animate.Transitioner;
+			import flare.vis.operator.layout.AxisLayout;
+			import flare.vis.data.NodeSprite;
+			import flare.data.converters.GraphMLConverter;
+			import flare.vis.data.Data;
+			import flare.data.DataSet;
+			
+			private const X_AXIS_NODE_FIELD  : String = "data.domain";
+			private const Y_AXIS_NODE_FIELD  : String = "data.scale";
+			private const EDGE_WIDTH         : uint = 2;
+			private const WHITISH            : Number = 0x44f0dfbd;
+			private const BROWNISH           : Number = 0x66c9bc65;
+//	    	private const DEFAULT_EDGECOLOUR : Number = 0xff952703;
+	    	private const DEFAULT_EDGECOLOUR : Number = 0xff0071a1;
+	    	private const INACTIVE_EDGECOLOUR: Number = 0xffbbbbbb;
+			
+			[Bindable]
+			private var _graphML: XML;
+			// list of string names corresponding to names in graphML data field X_AXIS_NODE_FIELD
+			[Bindable]
+			private var _domains: Array = new Array("Biophysical", "Economic", "Social");
+			// list of string names corresponding to names in graphML data field Y_AXIS_NODE_FIELD 
+			[Bindable]
+			private var _scales : Array = new Array("Population","Field", "Community", "Farm", "Ecosystem", "Regional", "Biosphere", "National", "Earth system", "Global"); 
+			
+			private var _tooltip: IToolTip;
+			
+			private var _visualisation: Visualization;
+			
+			[Bindable]
+			public function get graphML(): XML
+			{
+				return _graphML;
+			}
+			
+			public function set graphML(xml: XML): void
+			{
+				_graphML = xml;
+
+				// create visualisation
+				_visualisation: Visualization;
+
+				// create dataset
+				var dataSet:DataSet = new GraphMLConverter().parse(xml);
+				_visualisation = new Visualization(Data.fromDataSet(dataSet));
+				_visualisation.bounds = new Rectangle(100, 10, 500, 400); // TODO: refactor these hardcoded bounds
+				
+				// connect event handler to edges 
+				_visualisation.data.edges.visit(function(es: EdgeSprite): void {
+					es.lineWidth = EDGE_WIDTH;
+					es.arrowType = ArrowType.LINES;
+					if (es.data.active != "false")
+						es.lineColor = DEFAULT_EDGECOLOUR;
+					else
+						es.lineColor = INACTIVE_EDGECOLOUR;
+					
+//					es.buttonMode = true;
+//					es.addEventListener(MouseEvent.CLICK, handleEdgeClick);
+					es.addEventListener(MouseEvent.MOUSE_MOVE, handleEdgeMove); 
+					//es.addEventListener(MouseEvent.MOUSE_OUT, destroyToolTip);
+				});
+				
+				// connect event handler to nodes 
+				_visualisation.data.nodes.visit(function(ns: NodeSprite): void {
+					ns.size = 2*ns.size;
+					ns.renderer = new NodeRenderer();
+					
+//					ns.buttonMode = true;
+//					ns.addEventListener(MouseEvent.CLICK, handleNodeClick);
+					ns.addEventListener(MouseEvent.MOUSE_MOVE, handleNodeMove); 
+					ns.addEventListener(MouseEvent.MOUSE_OUT, destroyToolTip);
+				});
+				
+				// visualisation options
+				// set layout
+				var layout: AxisLayout = new AxisLayout(X_AXIS_NODE_FIELD, Y_AXIS_NODE_FIELD);
+				_visualisation.operators.add(layout);
+				// add labels
+				var labels: Labeler = new Labeler(function (ns: NodeSprite): String {
+					return ns.data.name;
+				});
+				_visualisation.operators.add(labels);
+				// set border drawing 'off'
+				_visualisation.xyAxes.borderColor = this.getStyle("backgroundColor");
+				// set scales
+				setXAxisScale(_visualisation.xyAxes.xAxis.axisScale);
+				setYAxisScale(_visualisation.xyAxes.yAxis.axisScale);
+
+				// update visualisation
+				// 1. remove previous components
+				removeAllChildren();
+				// 2. plaats components 
+				var container:UIComponent = new UIComponent();
+				container.percentWidth = 100;
+				container.percentHeight = 100;
+				container.addChild(_visualisation);
+				addChild(container);				
+
+				var root:NodeSprite = _visualisation.data.nodes[0];
+				_visualisation.data.root = root; 
+				_visualisation.update();//new Transitioner(1)).play();
+				
+				// add axis rectangle sprites as children to the axislines
+				createAxisSprites(_visualisation.xyAxes.xAxis, _visualisation.width);
+				createAxisSprites(_visualisation.xyAxes.yAxis, _visualisation.height);
+			}
+			
+			private function createAxisSprites(axis: Axis, totalBarSize: int): void
+			{
+				const barGap: int = 6;
+				
+				var total  : int = axis.gridLines.numChildren;
+				var barSize: int = (totalBarSize / total) - barGap;
+				for (var i: int=0; i<total; i++)
+				{
+					var line: AxisGridLine = axis.gridLines.getChildAt(i) as AxisGridLine;
+					line.lineColor = this.getStyle("backgroundColor"); // set line drawing 'off'
+					line.blendMode = BlendMode.MULTIPLY;
+					new AxisGridRect(line, barSize, getBarColour(i)); // adds it to the gridline automatically TODO: BARWIDTH is HARDCODED HERE
+				}
+			}
+			
+			private function getBarColour(index: int): Number
+			{
+				var i: Number = (index+1)%2;
+				if (((index+1)%2) == 1)
+					return WHITISH;
+				else
+					return BROWNISH;	
+			}
+			
+			private function setXAxisScale(scale: Object): void
+			{
+				if ((scale is ScaleBinding) && (_domains is Array))
+					(scale as ScaleBinding).ordinals = _domains;
+			}
+
+			private function setYAxisScale(scale: Object): void
+			{
+				if ((scale is ScaleBinding) && (_scales is Array))
+					(scale as ScaleBinding).ordinals = _scales;
+			}
+
+			private function handleEdgeMove(event:MouseEvent): void
+			{
+				if (event.target is DataSprite)
+				{
+					var ds: DataSprite = event.target as DataSprite;
+					createToolTip(ds.data.exchange, event.stageX, event.stageY); 
+				}
+			}
+			
+			private function handleNodeMove(event:MouseEvent): void
+			{
+				if (event.target is DataSprite)
+				{
+					var ds: DataSprite = event.target as DataSprite;
+					createToolTip(ds.data.description, event.stageX, event.stageY); 
+				}
+			}
+
+			private function createToolTip(tip: String, x: Number, y: Number): void
+			{
+				destroyToolTip(null);
+				_tooltip = ToolTipManager.createToolTip(tip, x, y);
+			}
+
+			private function destroyToolTip(event: Event): void
+			{
+				if (_tooltip != null)
+				{
+					ToolTipManager.destroyToolTip(_tooltip);
+					_tooltip = null;
+				}
+			}
+			
+			public function highLightNode(nodeId: String): void
+			{
+				_visualisation.data.nodes.visit(function(ns: NodeSprite): void {
+					if (ns.data.id != nodeId)
+						ns.renderer = new NodeRenderer();
+					else 
+						ns.renderer = new NodeRenderer(true);
+				});
+			}
+		]]>
+	</mx:Script>
+
+</mx:Canvas>

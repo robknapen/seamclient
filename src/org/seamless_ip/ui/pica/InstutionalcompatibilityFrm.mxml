@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+
+<!--
+  ~ wallace: InstutionalcompatibilityFrm.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+                height="100%" width="100%" layout="vertical" showCloseButton="true" close="{close()}"
+                creationPolicy="all" creationComplete="{cretionCompolete()}">
+
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.managers.PopUpManager;
+
+        import org.seamless_ip.services.transferobjects.pica.InstitutionalCompatibility;
+        import org.seamless_ip.services.transferobjects.pica.NaturalResourceFocus;
+        import org.seamless_ip.services.transferobjects.pica.PolicyType;
+        import org.seamless_ip.services.transferobjects.pica.PropertyRightsChanges;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        private function save():void {
+            PopUpManager.removePopUp(this);
+            var picaEvent:PicaEvent = new PicaEvent(PicaEvent.SAVEINSTCOMP);
+
+            instCompatibility.assessmentSummary = txtAssessmentSummary.text;
+            instCompatibility.name = txtName.text;
+            instCompatibility.date = txtDate.text;
+            instCompatibility.description = txtdescription.text;
+            instCompatibility.weblink = txtWebLink.text;
+            instCompatibility.naturalResourceFocus = (NaturalResourceFocus)(cmbNaturalResourceFocus.selectedItem);
+            instCompatibility.policyType = (PolicyType)(cmbPolicyTypes.selectedItem);
+            instCompatibility.propertyRightsChange = (PropertyRightsChanges)(cmbPropertyRightsChanges.selectedItem);
+
+            PicaInstCompServiceSingelton.update(instCompatibility);
+        }
+
+        // User
+        private var _user:User;
+
+        [Bindable]
+        public function get user():User {
+            return _user;
+        }
+
+        public function set user(user:User):void {
+            _user = user;
+        }
+
+
+        private var _pIC:PicaInstCompService;
+
+        public function get PicaInstCompServiceSingelton():PicaInstCompService
+        {
+            if (_pIC == null) {
+                _pIC = new PicaInstCompService(user);
+                _pIC.addEventListener(PicaInstCompEvent.UPDATEINSTCOMPCOMPLETE, RequestUpdate);
+                // Request open
+                // _pIC.addEventListener(OpenRequestsEvent.OPENREQUEST_SEND, RequestsOpen);
+                // Request fail
+                // _pIC.addEventListener(RequestProgressEvent.REQUEST_FAILED, RequestFailedGetInstitutionalcompabilities ) ;
+            }
+            return _pIC;
+        }
+
+        public function RequestUpdate(event:PicaInstCompEvent):void {
+            dispatchEvent(new PicaInstCompEvent(PicaInstCompEvent.FORCEREFRESH));
+            close();
+        }
+
+
+        private function cretionCompolete(): void {
+
+
+        }
+
+        private function close():void {
+            PopUpManager.removePopUp(this);
+        }
+
+        [Bindable]
+        public var isEditing:Boolean = false;
+
+        private var _institutionalCompatibility:InstitutionalCompatibility = null;
+
+        [Bindable]
+        public function get instCompatibility():InstitutionalCompatibility {
+            return _institutionalCompatibility;
+        }
+
+        public function set instCompatibility(instCompatibility:InstitutionalCompatibility):void {
+            _institutionalCompatibility = instCompatibility;
+            var i:Number
+            for (i = 0; i < naturalResourceFocus.length; i++) {
+                if ((naturalResourceFocus.getItemAt(i) as NaturalResourceFocus).id == instCompatibility.naturalResourceFocus.id) {
+                    cmbNaturalResourceFocus.selectedIndex = i;
+                    break;
+                }
+            }
+            for (i = 0; i < propertyRightsChanges.length; i++) {
+                if ((propertyRightsChanges.getItemAt(i) as PropertyRightsChanges).id == instCompatibility.propertyRightsChange.id) {
+                    cmbPropertyRightsChanges.selectedIndex = i;
+                    break;
+                }
+            }
+            for (i = 0; i < policyTypes.length; i++) {
+                if ((policyTypes.getItemAt(i) as PolicyType).id == instCompatibility.policyType.id) {
+                    cmbPolicyTypes.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+
+        private var _policyTypes:ArrayCollection = null;
+
+        [Bindable]
+        public function get policyTypes():ArrayCollection {
+            return _policyTypes;
+        }
+
+        public function set policyTypes(policyTypes:ArrayCollection):void {
+            _policyTypes = policyTypes;
+        }
+
+        private var _naturalResourceFocus:ArrayCollection = null;
+
+        [Bindable]
+        public function get naturalResourceFocus():ArrayCollection {
+            return _naturalResourceFocus;
+        }
+
+        public function set naturalResourceFocus(naturalResourceFocus:ArrayCollection):void {
+            _naturalResourceFocus = naturalResourceFocus;
+        }
+
+        private var _propertyRightsChanges:ArrayCollection = null;
+
+        [Bindable]
+        public function get propertyRightsChanges():ArrayCollection {
+            return _propertyRightsChanges;
+        }
+
+        public function set propertyRightsChanges(propertyRightsChanges:ArrayCollection):void {
+            _propertyRightsChanges = propertyRightsChanges;
+        }
+			
+		]]>
+	</mx:Script>
+    <mx:FormHeading label="Instutional compatibility"/>
+    <mx:Form width="100%" height="100%">
+        <mx:FormItem label="Name">
+            <mx:TextInput id="txtName" width="100%" text="{instCompatibility.name}"/>
+        </mx:FormItem>
+        <mx:FormItem label="Date">
+            <mx:TextInput id="txtDate" width="100%" text="{instCompatibility.date}"/>
+        </mx:FormItem>
+        <mx:FormItem label="Description">
+            <mx:TextArea id="txtdescription" width="100%" height="152" text="{instCompatibility.description}"/>
+        </mx:FormItem>
+        <mx:FormItem label="Assasment summery">
+            <mx:TextArea id="txtAssessmentSummary" width="100%" height="117"
+                         text="{instCompatibility.assessmentSummary}"/>
+        </mx:FormItem>
+        <mx:FormItem label="Weblink" width="100%">
+            <mx:TextInput id="txtWebLink" width="100%" text="{instCompatibility.weblink}"/>
+        </mx:FormItem>
+        <mx:FormItem label="Area of Intervention">
+            <mx:ComboBox id="cmbPolicyTypes" dataProvider="{policyTypes}" labelField="name">
+            </mx:ComboBox>
+        </mx:FormItem>
+        <mx:FormItem label="Natural Resource Focus">
+            <mx:ComboBox id="cmbNaturalResourceFocus" dataProvider="{naturalResourceFocus}" labelField="name">
+            </mx:ComboBox>
+        </mx:FormItem>
+        <mx:FormItem label="Property Rights Change">
+            <mx:ComboBox id="cmbPropertyRightsChanges" dataProvider="{propertyRightsChanges}" labelField="name">
+            </mx:ComboBox>
+        </mx:FormItem>
+        <mx:FormItem>
+
+            <mx:HBox width="100%" horizontalAlign="right" verticalAlign="bottom">
+                <mx:Button label="Discard"
+                           toolTip="Discard all changes"
+                           disabledIcon="@Embed('/img/icons/delete_edit_d.gif')"
+                           click="{close()}"
+                           icon="@Embed('/img/icons/delete_edit.gif')"/>
+                <mx:Button label="Save"
+                           id="btnSave"
+                           toolTip="Save all changes"
+                           click="{save()}"
+                           disabledIcon="@Embed('/img/icons/save_edit_d.gif')"
+                           icon="@Embed('/img/icons/save_edit.gif')"/>
+            </mx:HBox>
+        </mx:FormItem>
+
+    </mx:Form>
+</mx:TitleWindow>

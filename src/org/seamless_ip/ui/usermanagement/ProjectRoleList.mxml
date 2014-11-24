@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: ProjectRoleList.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+         width="100%"
+         height="100%"
+         paddingLeft="10"
+         paddingRight="10"
+         paddingTop="10"
+         paddingBottom="10">
+
+    <mx:Metadata>
+        [Event(name="create", type="flash.events.Event")]
+        [Event(name="update", type="flash.events.Event")]
+        [Event(name="delete", type="flash.events.Event")]
+    </mx:Metadata>
+
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+
+        import org.seamless_ip.services.transferobjects.seamproj.IRole;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.ProjectRole;
+
+        [Bindable]
+        private var projectRoleVOs:ArrayCollection;
+
+        [Bindable]
+        private var _projectRoles:ArrayCollection;
+
+        private var projectRoleListMediator:ProjectRoleListMediator;
+
+
+        [Bindable]
+        public  var selectedProjectRole:ProjectRole;
+
+
+        public static const CREATE:String = "create";
+        public static const UPDATE:String = "update";
+        public static const DELETE:String = "delete";
+        public static const CHANGE:String = "change";
+
+
+        public function get projectRoles():ArrayCollection {
+            return _projectRoles;
+        }
+
+        [Bindable]
+        public function set projectRoles(roles:ArrayCollection):void {
+            projectRoleListMediator = ProjectRoleListMediator.getInstance();
+            _projectRoles = roles;
+            projectRoleVOs = projectRoleListMediator.getProjectRoleVOs(roles);
+        }
+
+        public function update():void {
+            projectRoleVOs = projectRoleListMediator.getProjectRoleVOs(_projectRoles);
+        }
+
+        private function addHandler(event:MouseEvent):void {
+            dispatchEvent(new Event(CREATE));
+        }
+
+        private function editHandler(event:Event):void {
+            var selectedProjectRoleVO:ProjectRoleVO;
+
+            selectedProjectRoleVO = projectRoleListDataGrid.selectedItem as ProjectRoleVO;
+            selectedProjectRole = getProjectRole(selectedProjectRoleVO);
+            if (selectedProjectRole == null) return;
+            dispatchEvent(new Event(UPDATE));
+
+        }
+
+        private function removeHandler(event:MouseEvent):void {
+            if (selectedProjectRole == null) return;
+            dispatchEvent(new Event(DELETE));
+        }
+
+        private function changeHandler(event:Event):void {
+            var selectedProjectRoleVO:ProjectRoleVO;
+            var object:Object;
+
+            object = projectRoleListDataGrid.selectedItem;
+            if (object is ProjectRoleVO) {
+                selectedProjectRoleVO = projectRoleListDataGrid.selectedItem as ProjectRoleVO;
+                selectedProjectRole = getProjectRole(selectedProjectRoleVO);
+                dispatchEvent(new Event(CHANGE));
+            }
+
+
+        }
+
+        private function getProjectRole(projectRoleVO:ProjectRoleVO):ProjectRole {
+            var projectRole:ProjectRole;
+            var role:IRole;
+            var project:Project;
+            for each (role in _projectRoles) {
+                if (( role != null) && ( role is ProjectRole)) {
+                    projectRole = ProjectRole(role);
+                    project = projectRole.project;
+                    if (( projectRoleVO.roleTitle == projectRole.title ) &&
+                        ( projectRoleVO.projectTitle == project.title )) {
+                        return projectRole;
+                    }
+                }
+
+
+            }
+            return null;
+        }
+
+        public function show():void {
+            visible = true;
+            includeInLayout = true;
+        }
+
+        public function hide():void {
+            visible = false;
+            includeInLayout = false;
+        }
+			
+		
+			
+			
+		]]>
+	</mx:Script>
+    <mx:AdvancedDataGrid id="projectRoleListDataGrid"
+                         wordWrap="true"
+                         variableRowHeight="true"
+                         height="100%"
+                         width="100%"
+                         dataProvider="{projectRoleVOs}" doubleClickEnabled="true"
+                         change="changeHandler(event)" itemDoubleClick="editHandler(event)">
+        <mx:columns>
+            <mx:AdvancedDataGridColumn headerText="role" dataField="roleTitle"/>
+            <mx:AdvancedDataGridColumn headerText="project" dataField="projectTitle"/>
+            <mx:AdvancedDataGridColumn headerText="description" dataField="projectDescription"/>
+        </mx:columns>
+    </mx:AdvancedDataGrid>
+    <mx:HBox width="100%">
+        <mx:Button label="New..."
+                   click="addHandler(event)"
+                   enabled="{projectRoles!=null}"
+                   icon="@Embed('/img/icons/seamless-file.gif')"
+                   disabledIcon="@Embed('/img/icons/seamless-file-greyed.gif')"
+                   toolTip="Create a new projectRole"/>
+        <mx:Button
+                label="Edit..."
+                width="120"
+                click="editHandler(event)"
+                toolTip="Open the selected Project Role"
+                enabled="{selectedProjectRole!=null}"
+                icon="@Embed('/img/icons/seamless-folder.gif')"
+                disabledIcon="@Embed('/img/icons/seamless-folder-greyed.gif')"
+                />
+        <mx:Spacer width="100%"/>
+        <mx:Button label="Remove"
+                   click="removeHandler(event)"
+                   icon="@Embed('/img/icons/seamless-delete.gif')"
+                   disabledIcon="@Embed('/img/icons/seamless-delete-greyed.gif')"
+                   enabled="{selectedProjectRole!=null}"
+                   toolTip="Remove the selected project role"
+                   id="removeButton"/>
+    </mx:HBox>
+
+
+</mx:VBox>

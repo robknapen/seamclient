@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: IndicatorSelector.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+           width="100%" height="100%"
+           xmlns:components="org.seamless_ip.ui.common.*">
+
+    <mx:Metadata>
+        [Event(name="change")]
+    </mx:Metadata>
+    <!--
+        A Seam:PRESS component that displays information about indicators and
+        allows the user to select from them.
+
+        @author Rob Knapen
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.events.ValidationResultEvent;
+
+        import org.seamless_ip.services.transferobjects.indi.IIndicator;
+
+        [Bindable]
+        public var title:String = "Select Indicator(s)";
+        [Bindable]
+        public var allowMultiSelect:Boolean = true;
+
+        [Bindable]
+        private var _sourceIndicators:ArrayCollection;
+        [Bindable]
+        private var _displayedIndicators:ArrayCollection = new ArrayCollection();
+        [Bindable]
+        private var _indicatorValueTypes:ArrayCollection = new ArrayCollection();
+
+
+        public function set indicators(indicators:ArrayCollection):void {
+            _sourceIndicators = indicators;
+            updateFilters();
+            applyFilters();
+        }
+
+
+        public function get indicators():ArrayCollection {
+            return _sourceIndicators;
+        }
+
+
+        /**
+         * Updates the data providers for the spatial and temporal scales
+         * comboboxes based on the scales available from the indicators.
+         */
+        private function updateFilters():void {
+            _indicatorValueTypes.removeAll();
+
+            if (_sourceIndicators != null) {
+                for each (var indi:IIndicator in _sourceIndicators) {
+                    addIndicatorValueType(indi.getIndicatorValueType());
+                }
+            }
+        }
+
+
+        private function addIndicatorValueType(type:String):void {
+            if ((type != null) && (type.length > 0)) {
+                if (!_indicatorValueTypes.contains(type))
+                    _indicatorValueTypes.addItem(type);
+            }
+        }
+
+
+        /**
+         * Filters the displayed list of experiments based on the
+         * selection in the filter comboboxes. It clears the current
+         * list selection.
+         */
+        private function applyFilters():void {
+            _displayedIndicators.removeAll();
+
+            // get the filter values
+            var type:String = String(comboBoxIndicatorTypes.selectedItem);
+
+            // fill the display list by filtering the source list
+            if ((_sourceIndicators != null) && (type != null)) {
+                for each (var indi:IIndicator in _sourceIndicators) {
+                    if (indi.getIndicatorValueType() != null) {
+                        if (indi.getIndicatorValueType() == type) {
+                            _displayedIndicators.addItem(indi);
+                        }
+                    }
+                }
+            }
+        }
+
+
+        /**
+         * Clears the current selection of items.
+         */
+        public function clearSelection():void {
+            indicatorInput.text = "";
+            dataGrid.selectedItems = null;
+        }
+
+
+        /**
+         * Sets the current selection based on the specified ids.
+         */
+        public function updateSelection(selectedIds:ArrayCollection):void {
+            indicatorInput.text = "";
+
+            // use the text box input to select indicator(s) outside the project
+            if (!allInTable(selectedIds)) {
+                indicatorInput.text = createSelectedText(selectedIds);
+            }
+            else {
+                var selection:ArrayCollection = new ArrayCollection();
+                for each (var obj:Object in _sourceIndicators) {
+                    for each (var id:String in selectedIds) {
+                        if (obj.id == id) {
+                            selection.addItem(obj);
+                            break;
+                        }
+                    }
+                }
+                dataGrid.selectedItems = selection.toArray();
+            }
+        }
+
+
+        public function getSelectedIds():ArrayCollection {
+            var result:ArrayCollection = new ArrayCollection();
+            // text input box overrules table selection
+            if ((indicatorInput.text != null) && (indicatorInput.text.length > 0)) {
+                var r:ValidationResultEvent = indicatorInputValidator.validate(null, true);
+                if ((r != null) && (r.type == ValidationResultEvent.VALID))
+                    result = new ArrayCollection(indicatorInput.text.split(","));
+                // TODO check if all selected match the filters?
+            }
+            else {
+                for each (var item:Object in dataGrid.selectedItems)
+                    result.addItem(item.id);
+            }
+            return result;
+        }
+
+
+        /**
+         * Handles change notifications from the cells.
+         */
+        private function changed(event:Event):void {
+            dispatchEvent(new Event("change"));
+        }
+
+
+        /**
+         * Checks if all the specified ids refer to indicators that can
+         * be selected from the table.
+         */
+        private function allInTable(ids:ArrayCollection):Boolean {
+            var found:Boolean;
+            for each (var id:String in ids) {
+                found = false;
+                for each (var obj:Object in _sourceIndicators) {
+                    if (obj.id == id) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                    return false;
+            }
+            return true;
+        }
+
+
+        /**
+         * Create a text string with a list of ids, seperated by a ",".
+         */
+        private function createSelectedText(ids:ArrayCollection):String {
+            var result:String = "";
+            for each (var id:String in ids) {
+                if (result.length > 0)
+                    result += ",";
+                result += id;
+            }
+            return result;
+        }
+		]]>
+	</mx:Script>
+
+    <!--
+     ===========================================================================
+         Validators
+     ===========================================================================
+     -->
+
+    <mx:RegExpValidator id="indicatorInputValidator"
+                        source="{indicatorInput}" property="text"
+                        flags="g" expression="^\d+[,\d+]*$"
+                        noMatchError="Please enter indicator number(s), separated by commas."
+            />
+
+    <!--
+     ===========================================================================
+         Components
+     ===========================================================================
+     -->
+
+    <mx:HBox
+            width="100%"
+            height="100%"
+            >
+
+        <!-- left margin text with some explaination -->
+        <mx:TextArea width="100" height="100%"
+                     editable="false" enabled="true" wordWrap="true" backgroundAlpha="0.0">
+            <mx:text>Select the indicator to display the calculated values for. The system checks which indicator has
+                values available and will only make those selectable. For the greyed out indicators no calculated values
+                are stored.
+            </mx:text>
+        </mx:TextArea>
+
+        <!-- center container with inputs -->
+        <mx:VBox id="viewReady"
+                 width="100%" height="100%"
+                 paddingBottom="10" paddingTop="5"
+                 paddingLeft="10" paddingRight="10">
+            <!-- comboboxes to filter on properties -->
+            <mx:Label width="100%" text="Selected indicators must share the same type, spatial and temporal scales:"/>
+            <mx:HBox width="100%" verticalAlign="middle">
+                <mx:Label width="100" text="Indicator Types:" textAlign="left"/>
+                <mx:ComboBox id="comboBoxIndicatorTypes" width="100%"
+                             dataProvider="{_indicatorValueTypes}"
+                             change="applyFilters()"/>
+            </mx:HBox>
+            <!-- table with all matching items -->
+            <mx:DataGrid id="dataGrid"
+                         dataProvider="{_displayedIndicators}"
+                         width="100%"
+                         height="100%"
+                         change="changed(event)"
+                         allowMultipleSelection="{allowMultiSelect}"
+                    >
+
+                <mx:columns>
+                    <mx:DataGridColumn headerText="ID" dataField="id" width="50" editable="false"
+                                       itemRenderer="org.seamless_ip.ui.seampress.IndicatorItemRenderer"
+                            />
+                    <components:DataGridColumnNested headerText="Name" dataField="label_en" sortable="true"
+                                                     itemRenderer="org.seamless_ip.ui.seampress.IndicatorItemRenderer"
+                            />
+                    <components:DataGridColumnNested headerText="Unit" dataField="unit" sortable="true"
+                                                     itemRenderer="org.seamless_ip.ui.seampress.IndicatorItemRenderer"
+                            />
+                    <components:DataGridColumnNested headerText="Spatial Resolution" dataField="spatialScale.resolution"
+                                                     sortable="true"
+                                                     itemRenderer="org.seamless_ip.ui.seampress.IndicatorItemRenderer"
+                            />
+                    <mx:DataGridColumn headerText="Status" width="50" editable="false"
+                                       itemRenderer="org.seamless_ip.ui.indicators.EndorsedStateRenderer"
+                            />
+
+                    <mx:DataGridColumn headerText="" editable="false" width="30">
+                        <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:VBox width="100%" height="100%" horizontalAlign="center" verticalAlign="middle">
+                                    <mx:Script>
+										<![CDATA[
+											import mx.core.Application;
+                                        import mx.core.IFlexDisplayObject;
+                                        import mx.managers.PopUpManager;
+
+                                        import org.seamless_ip.services.transferobjects.indi.IIndicator;
+                                        import org.seamless_ip.ui.indicators.IndicatorPropertiesDlg;
+
+                                        private function showProperties(data:Object):void
+                                        {
+                                            if (data is IIndicator)
+                                            {
+                                                var dialog:IFlexDisplayObject = PopUpManager.createPopUp(this, IndicatorPropertiesDlg, true);
+                                                IndicatorPropertiesDlg(dialog).indicator = IIndicator(data);
+                                                dialog.x = (Application.application.width - dialog.width) / 2;
+                                                dialog.y = (Application.application.height - dialog.height) / 3;
+                                            }
+                                        }
+										]]>
+									</mx:Script>
+                                    <mx:Button
+                                            styleName="flattenedButton"
+                                            width="16" height="16"
+                                            click="showProperties(data)"
+                                            toolTip="Show more properties of the indicator"
+                                            enabled="true"
+                                            icon="@Embed('/img/icons/seamless-info-up.gif')"
+                                            overIcon="@Embed(source='/img/icons/seamless-info-up-selected.gif')"
+                                            disabledIcon="@Embed(source='/img/icons/seamless-info-disabled.gif')"
+                                            />
+                                </mx:VBox>
+                            </mx:Component>
+                        </mx:itemRenderer>
+                    </mx:DataGridColumn>
+
+                </mx:columns>
+            </mx:DataGrid>
+
+            <mx:HBox width="100%">
+                <mx:Label text="Use the Ctrl or Shift keys to select multiple items."
+                          width="100%"
+                          enabled="false"
+                          visible="{allowMultiSelect}"
+                        />
+                <mx:Spacer width="100%" height="100%"
+                           visible="{allowMultiSelect}"
+                        />
+                <mx:Label text="Indicator:" enabled="false"/>
+                <mx:TextInput id="indicatorInput" width="100%"
+                              focusOut="changed(event)"
+                        />
+            </mx:HBox>
+        </mx:VBox>
+    </mx:HBox>
+
+</mx:Canvas>

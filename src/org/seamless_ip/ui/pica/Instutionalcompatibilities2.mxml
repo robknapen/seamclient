@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: Instutionalcompatibilities2.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" creationComplete="{init()}"
+           xmlns:ns="org.seamless_ip.ui.pica.*" xmlns:ns1="org.seamless_ip.ui.common.*">
+    <!--
+    Screen with overview of all Instutionalcompatibilities for a specific project.
+    -->
+    <mx:Script>
+		<![CDATA[
+        import mx.collections.ArrayCollection;
+        import mx.controls.Alert;
+        import mx.managers.PopUpManager;
+
+        import org.seamless_ip.services.remoting.OpenRequestsEvent;
+        import org.seamless_ip.services.remoting.RequestProgressEvent;
+        import org.seamless_ip.services.transferobjects.pica.InstitutionalCompatibility;
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+        private function init():void {
+            fakeinit();
+            PicaMetaDataServiceSingelton.getMetadata();
+
+            if (!this.hasEventListener(PicaInstCompEvent.FORCEREFRESH)) {
+                this.addEventListener(PicaInstCompEvent.FORCEREFRESH, forceRefresh);
+            }
+        }
+
+        private function forceRefresh(event:PicaInstCompEvent) :void {
+            lastView = 1;
+            picaViewStack.selectedIndex = 1;
+            refresh(null);
+
+        }
+
+        private function fakeinit(): void {
+
+        }
+
+        // Last view (used to show progressbar)
+        private var lastView:int = 1;
+
+
+        // User
+        private var _user:User;
+
+        [Bindable]
+        public function get user():User {
+            return _user;
+        }
+
+        public function set user(user:User):void {
+            _user = user;
+        }
+
+        // Project
+        private var _project:Project;
+
+        [Bindable]
+        public function get project():Project {
+            return _project;
+        }
+
+        public function set project(project:Project):void {
+            _project = project;
+        }
+
+        // ----------- Metadata --------------
+        [Bindable]
+        private var _pM:PicaMetaDataService;
+
+        public function get PicaMetaDataServiceSingelton():PicaMetaDataService
+        {
+            if (_pM == null) {
+                _pM = new PicaMetaDataService(user);
+
+                // Request Metadata
+                _pM.addEventListener(PicaMetaDataEvent.GETMETADATACOMPLETE, RequestGetMetadata);
+                // Request open
+                _pM.addEventListener(OpenRequestsEvent.OPENREQUEST_SEND, RequestsOpen);
+                // Request fail
+                _pM.addEventListener(RequestProgressEvent.REQUEST_FAILED, RequestFailed);
+            }
+            return _pM;
+        }
+
+        public function RequestGetMetadata(event:PicaMetaDataEvent):void {
+            // Do nothing
+            refresh(null);
+        }
+
+        public function RequestFailed(event:RequestProgressEvent):void {
+            Alert.show(event.message);
+        }
+
+        public function RequestsOpen(event:OpenRequestsEvent):void {
+            if (event.requests == 0) {
+                picaViewStack.selectedIndex = lastView;
+            } else {
+                progressscreen.invalidateDisplayList();
+                picaViewStack.selectedIndex = 0;
+            }
+        }
+
+        // ------------- Instcomp --------------
+
+        // All instutionalcompatibilities for a project
+
+        private var _instutionalcompatibilities:ArrayCollection = null;
+
+        [Bindable]
+        public function set instutionalcompatibilities(instutionalcompatibilities: ArrayCollection):void {
+            _instutionalcompatibilities = instutionalcompatibilities;
+        }
+
+        public function get instutionalcompatibilities():ArrayCollection {
+            return _instutionalcompatibilities;
+        }
+
+
+        private var _pIC:PicaInstCompService
+
+        public function get PicaInstCompServiceSingelton():PicaInstCompService
+        {
+            if (_pIC == null) {
+                _pIC = new PicaInstCompService(user);
+                _pIC.addEventListener(PicaInstCompEvent.GETINSTCOMPCOMPLETE, RequestGetInstitutionalcompabilities);
+                // Request open
+                _pIC.addEventListener(OpenRequestsEvent.OPENREQUEST_SEND, RequestsOpen);
+                // Request fail
+                _pIC.addEventListener(RequestProgressEvent.REQUEST_FAILED, RequestFailedGetInstitutionalcompabilities);
+
+
+            }
+            return _pIC;
+        }
+
+        public function RequestGetInstitutionalcompabilities(event:PicaInstCompEvent):void {
+            instutionalcompatibilities = PicaInstCompServiceSingelton.institutionalCompatibilities;
+        }
+
+        public function RequestFailedGetInstitutionalcompabilities(event:RequestProgressEvent):void {
+            Alert.show(event.message);
+        }
+
+        private function refresh(evt:MouseEvent):void {
+            PicaInstCompServiceSingelton.findAllByProjectID(project.id);
+        }
+
+
+        public function onDelete(avEven:Event, avData:Object):void
+        {
+            PicaInstCompServiceSingelton.deleteInstComp(
+                    (avData as InstitutionalCompatibility).id, project.id);
+        }
+
+        public function onResult(avEvent :Event, avData  :Object):void
+        {
+            Alert.show("Implement me");
+        }
+
+        // Edit
+        private var _instCompFrm:InstutionalcompatibilityFrm = null;
+
+        public function get instCompFrm():InstutionalcompatibilityFrm {
+            if (_instCompFrm == null) {
+                _instCompFrm = new InstutionalcompatibilityFrm();
+                _instCompFrm.naturalResourceFocus = PicaMetaDataServiceSingelton.naturalResourceFocus;
+                _instCompFrm.policyTypes = PicaMetaDataServiceSingelton.policyType;
+                _instCompFrm.propertyRightsChanges = PicaMetaDataServiceSingelton.propertyRightsChanges;
+            }
+            return _instCompFrm;
+        }
+
+        public function onEdit(avEvent :Event, avData  :Object):void
+        {
+
+            removeFindEventListener();
+            PicaInstCompServiceSingelton.addEventListener(PicaInstCompEvent.FINDINSTCOMPCOMPLETE, RequestFindInstitutionalcompabilities);
+
+            PicaInstCompServiceSingelton.find((InstitutionalCompatibility)(avData).id);
+        }
+
+        private function removeFindEventListener(): void {
+            if (PicaInstCompServiceSingelton.hasEventListener(PicaInstCompEvent.FINDINSTCOMPCOMPLETE)) {
+
+                PicaInstCompServiceSingelton.removeEventListener(PicaInstCompEvent.FINDINSTCOMPCOMPLETE, RequestFindInstitutionalcompabilities);
+                PicaInstCompServiceSingelton.removeEventListener(PicaInstCompEvent.FINDINSTCOMPCOMPLETE, RequestFindInstitutionalcompEval);
+            }
+        }
+
+        public function RequestFindInstitutionalcompabilities(event:PicaInstCompEvent):void {
+            popInstCompFrm(PicaInstCompServiceSingelton.institutionalCompatibility);
+        }
+
+        public function onOpen(avEvent :Event, avData  :Object):void
+        {
+            lastView = 2;
+            removeFindEventListener();
+            PicaInstCompServiceSingelton.addEventListener(PicaInstCompEvent.FINDINSTCOMPCOMPLETE, RequestFindInstitutionalcompEval);
+            PicaInstCompServiceSingelton.find((InstitutionalCompatibility)(avData).id);
+        }
+
+        public function RequestFindInstitutionalcompEval(event:PicaInstCompEvent):void {
+            picaViewStack.selectedIndex = 2;
+            instutionalcompatibilityEvaluate.institutionalCompatibility = PicaInstCompServiceSingelton.institutionalCompatibility;
+        }
+
+
+        private function newInstitutionalComp(evt:MouseEvent):void {
+            var instComp:InstitutionalCompatibility = new InstitutionalCompatibility();
+            instComp.naturalResourceFocus = PicaMetaDataServiceSingelton.defNaturalResourceFocus;
+            instComp.policyType = PicaMetaDataServiceSingelton.defPolicyType;
+            instComp.propertyRightsChange = PicaMetaDataServiceSingelton.defPropertyRightsChanges;
+            instComp.project = project;
+            popInstCompFrm(instComp);
+        }
+
+        private function popInstCompFrm(instComp:InstitutionalCompatibility):void {
+            instCompFrm.isEditing = true;
+            PopUpManager.addPopUp(instCompFrm, this, true);
+            PopUpManager.centerPopUp(instCompFrm);
+            instCompFrm.instCompatibility = instComp;
+        }
+		]]>
+	</mx:Script>
+    <mx:ViewStack id="picaViewStack" height="100%" width="100%">
+        <ns1:ServerProgressView id="progressscreen"/>
+
+        <mx:Panel height="100%" width="100%" layout="vertical">
+            <mx:HBox width="100%">
+                <mx:FormHeading label="Institutional compatibilities"/>
+                <mx:Spacer width="100%"/>
+                <mx:Button label="Refresh"
+                           toolTip=""
+                           click="{refresh(event)}"
+                           disabledIcon="@Embed('/img/icons/refresh.gif')"
+                           icon="@Embed('/img/icons/refresh.gif')"/>
+            </mx:HBox>
+            <mx:DataGrid id="dgInstComp" height="100%" width="100%"
+                         dataProvider="{instutionalcompatibilities}"
+                         wordWrap="true">
+                <mx:columns>
+                    <mx:DataGridColumn headerText="Name" dataField="name"/>
+                    <mx:DataGridColumn headerText="Description" dataField="description"/>
+                    <mx:DataGridColumn headerText="Date" dataField="date" width="80"/>
+                    <mx:DataGridColumn editable="false" width="60">
+                        <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:HBox>
+                                    <mx:Button label="Edit" click="outerDocument.onEdit( event, data )"/>
+                                </mx:HBox>
+                            </mx:Component>
+                        </mx:itemRenderer>
+                    </mx:DataGridColumn>
+                    <mx:DataGridColumn editable="false" width="70">
+                        <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:HBox>
+                                    <mx:Button label="Open" click="outerDocument.onOpen( event, data )"/>
+                                </mx:HBox>
+                            </mx:Component>
+                        </mx:itemRenderer>
+                    </mx:DataGridColumn>
+                    <mx:DataGridColumn editable="false" width="80">
+                        <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:HBox>
+                                    <mx:Button label="Result" click="outerDocument.onResult( event, data )"/>
+                                </mx:HBox>
+                            </mx:Component>
+                        </mx:itemRenderer>
+                    </mx:DataGridColumn>
+                    <mx:DataGridColumn editable="false" width="80">
+                        <mx:itemRenderer>
+                            <mx:Component>
+                                <mx:HBox>
+                                    <mx:Button label="Delete" click="outerDocument.onDelete( event, data )"/>
+                                </mx:HBox>
+                            </mx:Component>
+                        </mx:itemRenderer>
+                    </mx:DataGridColumn>
+                </mx:columns>
+            </mx:DataGrid>
+            <mx:HBox width="100%" horizontalAlign="right" verticalAlign="bottom">
+                <!--	<mx:Button label="Debug...."
+                toolTip=""
+                click="{picaViewStack.selectedIndex = 2}"
+                disabledIcon="@Embed('/img/icons/add_obj.gif')"
+                icon="@Embed('/img/icons/add_obj.gif')"/>-->
+                <mx:Button label="Add new"
+                           toolTip=""
+                           click="{newInstitutionalComp(event)}"
+                           disabledIcon="@Embed('/img/icons/add_obj.gif')"
+                           icon="@Embed('/img/icons/add_obj.gif')"/>
+            </mx:HBox>
+        </mx:Panel>
+        <ns:InstutionalcompatibilityEvaluate id="instutionalcompatibilityEvaluate"
+                                             user="{user}"
+                                             pICAIndicatorGeneral="{PicaMetaDataServiceSingelton.pICAIndicatorGeneral}"
+                                             cIAS="{PicaMetaDataServiceSingelton.crucialInstitutionalAspect}"
+                                             picaInstCompService="{PicaInstCompServiceSingelton}"
+
+                />
+    </mx:ViewStack>
+</mx:Canvas>

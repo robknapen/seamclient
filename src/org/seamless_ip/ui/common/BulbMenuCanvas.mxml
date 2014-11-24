@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ wallace: BulbMenuCanvas.mxml
+  ~ ==============================================================================
+  ~ This work has been carried out as part of the SEAMLESS Integrated Framework
+  ~ project, EU 6th Framework Programme, contract no. 010036-2 and/or as part
+  ~ of the SEAMLESS association.
+  ~
+  ~ Copyright (c) 2009 The SEAMLESS Association.
+  ~
+  ~ For more information: http://www.seamlessassociation.org;
+  ~ email: info@seamless-if.org
+  ~
+  ~ The contents of this file is subject to the SEAMLESS Association License for
+  ~ software infrastructure and model components Version 1.1 (the "License");
+  ~ you may not use this file except in compliance with the License. You may
+  ~ obtain a copy of the License at http://www.seamlessassociation.org/License.htm
+  ~
+  ~ Software distributed under the License is distributed on an "AS IS"  basis,
+  ~ WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
+  ~ the specific governing rights and limitations.
+  ~
+  ~ The Initial Developers of the Original Code are:
+  ~  - Benny Johnsson; Lund University
+  ~  - Rob Knapen; Alterra, Wageningen UR
+  ~  - Michiel Rop; Alterra, Wageningen UR / ilionX
+  ~  - Lorenzo Ruinelli; IDSIA Dalle Molle Institute for Artificial Intelligence
+  ~ ================================================================================
+  ~ Contributor(s): N/A
+  ~ ================================================================================
+  -->
+
+<mx:Canvas
+        xmlns:mx="http://www.adobe.com/2006/mxml" width="140"
+        initialize="init()"
+        creationComplete="updateButtonState()"
+        verticalScrollPolicy="off"
+        backgroundAlpha="0.0"
+        >
+
+    <mx:Metadata>
+        [Event(name="activeTaskChanged", type="flash.events.Event")]
+    </mx:Metadata>
+
+    <mx:states>
+        <mx:State name="modelingSubMenu">
+            <mx:SetProperty target="{experimentDesignerButton}" name="visible" value="true"/>
+            <mx:SetProperty target="{experimentQueueingButton}" name="visible" value="true"/>
+            <mx:SetProperty target="{modelChainsButton}" name="visible" value="true"/>
+            <mx:SetProperty target="{calculationsButton}" name="visible" value="true"/>
+        </mx:State>
+    </mx:states>
+
+    <mx:Script>
+        <![CDATA[
+
+        /**
+         * Menu showing main entry points for working with app.
+         */
+		import mx.binding.utils.ChangeWatcher;
+        import mx.controls.Button;
+        import mx.controls.RadioButtonGroup;
+        import mx.core.Application;
+
+        import org.seamless_ip.services.transferobjects.seamproj.Project;
+        import org.seamless_ip.services.transferobjects.seamproj.User;
+
+		// Toggle to force disable the processing center related navigation
+		// options. Set to true to always prohibit access to the processing
+		// center functionality, for example when it is not yet operational :-)
+		// When set to false the processing center is enabled depending on
+		// the active project and user.
+		private static const ALWAYS_DISABLE_PROCESSING_CENTER_ACCESS: Boolean = true;
+		
+		// Toggle to force disable the institutional analysis (PICA) related
+		// navigation options. Set to true to always prohibit access to the
+		// PICA functionality, for example when it is not yet operational :-)
+		// When set to false PICA is enabled depending on the active project
+		// and user.
+		private static const ALWAYS_DISABLE_PICA_ACCESS: Boolean = true;
+
+        // tooltips
+        private const TOOLTIP_PROJECT_UPDATING:String =
+                "Describe the project and select its spatial scale and the model chain to use to handle this project.";
+        private const TOOLTIP_PROJECT_VIEWING:String =
+                "Visualise the project description, scale and the selected model chain.";
+        private const TOOLTIP_NARRATIVES_UPDATING:String =
+                "Create experiments through the selection of one Outlook, one Policy option and one Context and describe their narratives.";
+        private const TOOLTIP_NARRATIVES_VIEWING:String =
+                "Visualise narrative description of experiments and their components (Outlook, Policy option and Context).";
+        private const TOOLTIP_INDICATORS_UPDATING:String =
+                "Select the sustainability indicators based on the Goal Oriented Framework and within the Indicator Library.";
+        private const TOOLTIP_INDICATORS_VIEWING:String =
+                "Visualise the selection of sustainability indicators through the Goal Oriented Framework and within the Indicator Library.";
+        private const TOOLTIP_MODELLING_UPDATING:String =
+                "Parameterise experiments, visualise the model chains and manage runs of experiments.";
+        private const TOOLTIP_MODELLING_VIEWING:String =
+                "Visualise parameters of experiments and status of experiments runs (not calculated, in progress, completed).";
+        private const TOOLTIP_EXPERIMENT_QUEUEING:String =
+                "Put experiments into a queue for processing on the SEAMLESS servers - This module is currently in development and will be available in a future version.";
+        private const TOOLTIP_EXPERIMENT_PROCESSING:String =
+                "Check the processing status of experiments - This module is currently in development and will be available in a future version.";
+        private const TOOLTIP_VISUALISATIONS:String =
+                "Visualise indicators values through tables, graphs, spider diagrams and maps.";
+        private const TOOLTIP_INSTITUTIONAL:String = 
+        		"Institutional Analysis - This module is currently in development and will be available in a future version.";
+        
+        private const TOOLTIP_HELPTOPICS:String = 
+        		"Search and view available help topics to learn more about SEAMLESS and the SEAMLESS-IF tool.";
+        private const ERROR_CANNOT_WATCH: String = 
+        		"cannot watch application for changes of user or project!";
+
+        public static const TASK_PROJECT: String = "projectDefinition";
+        public static const TASK_NARRATIVE: String = "experimentNarratives";
+        public static const TASK_INDICATOR: String = "indicatorSelection";
+        public static const TASK_MODELING_EXPERIMENT: String = "experimentDesigner";
+        public static const TASK_MODELING_QUEUEING: String = "experimentQueueing";
+        public static const TASK_MODELING_CHAIN: String = "modelChain";
+        public static const TASK_MODELING_CALCULATION: String = "calculations";
+        public static const TASK_VISUALISATION: String = "visualisations";
+        public static const TASK_INSTITUTIONAL: String = "institutionalAnalyses";
+        public static const TASK_BACKGROUND: String = "background";
+
+        [Bindable]
+        public var activeTask: String = TASK_PROJECT;
+
+        [Bindable]
+        private var _project:Project;
+        [Bindable]
+        private var _user:User = new User();
+
+        public function set project(project:Project):void {
+            _project = project;
+            setVisibilityBasedOnPermission();
+        }
+
+        public function set user(user:User):void {
+            _user = user;
+            setVisibilityBasedOnPermission();
+        }
+
+
+        private function setVisibilityBasedOnPermission():void {
+	        if (ALWAYS_DISABLE_PROCESSING_CENTER_ACCESS) {
+	        	trace("Forced disabling of GUI Processing Center functionality...");
+	        	experimentQueueingButton.enabled = false;
+	        	calculationsButton.enabled = false;
+	        } else {
+	            if ((_project != null) && (_user != null)) {
+	                experimentQueueingButton.enabled = _user.canDoForProject(_project.id, "EXECUTE", "EXPERIMENT");
+	                calculationsButton.enabled = _user.canDoForProject(_project.id, "EXECUTE", "EXPERIMENT");
+	            }
+	        }
+
+			if (ALWAYS_DISABLE_PICA_ACCESS) {
+	        	trace("Forced disabling of GUI Institutional Analysis (PICA) functionality...");
+				picaButton.enabled = false;
+			} else {
+	            if ((_project != null) && (_user != null)) {
+	            	if (_user.canDoForProject(_project.id, "READ", "PICA") ||
+						_user.canDoForProject(_project.id, "UPDATE", "PICA") ||
+						_user.canDoForProject(_project.id, "DELETE", "PICA") ||
+						_user.canDoForProject(_project.id, "CREATE", "PICA")) {
+	                    picaButton.enabled = true;
+		            }
+				}
+			}
+        }
+
+
+        private function setTask(event:Event, task:String):void {
+            // don't react on disabled radiobuttons
+            if (event.currentTarget is RadioButton) {
+                if (!RadioButton(event.currentTarget).enabled)
+                    return;
+            }
+            activeTask = task;
+            updateGuideLines();
+            dispatchEvent(new Event("activeTaskChanged"));
+        }
+
+
+        private function init(): void {
+            if (ChangeWatcher.canWatch(Application.application, "activeUser"))
+                ChangeWatcher.watch(Application.application, "activeUser", updateUser);
+            else
+                throw new Error(ERROR_CANNOT_WATCH);
+
+            if (ChangeWatcher.canWatch(Application.application, "activeProject"))
+                ChangeWatcher.watch(Application.application, "activeProject", updateProject);
+            else
+                throw new Error(ERROR_CANNOT_WATCH);
+        }
+
+
+        private function updateUser(event:Event):void {
+            updateButtonState();
+        }
+
+
+        private function updateProject(event:Event):void {
+            updateButtonState();
+        }
+
+
+        private function updateButtonState():void {
+            // get current user and project
+            var user:User = getUser();
+            var project:Project = getProject();
+
+            // Buttons independant from user/project permissions
+            backgroundButton.enabled = true;
+            // TODO enable PICA button when functionality is implemented
+            picaButton.enabled = false;
+
+            // Buttons depending on user/project permissions
+            var activate:Boolean = (user != null) && (project != null);
+            projDefButton.enabled = activate;
+            narrativeExpButton.enabled = activate;
+            indicatorSelectionButton.enabled = activate;
+            modellingButton.enabled = activate;
+            visualisationsButton.enabled = activate;
+            backgroundButton.enabled = activate;
+
+            // set button tooltips according to user/project permissions
+            if (activate) {
+                if (user.canDoForProject(project.id, "UPDATE", "PROJECT"))
+                    projDefButton.toolTip = TOOLTIP_PROJECT_UPDATING;
+                else
+                    projDefButton.toolTip = TOOLTIP_PROJECT_VIEWING;
+
+                if (user.canDoForProject(project.id, "UPDATE", "NARRATIVE_EXPERIMENT"))
+                    narrativeExpButton.toolTip = TOOLTIP_NARRATIVES_UPDATING;
+                else
+                    narrativeExpButton.toolTip = TOOLTIP_NARRATIVES_VIEWING;
+
+                if (user.canDoForProject(project.id, "UPDATE", "INDICATOR"))
+                    indicatorSelectionButton.toolTip = TOOLTIP_INDICATORS_UPDATING;
+                else
+                    indicatorSelectionButton.toolTip = TOOLTIP_INDICATORS_VIEWING;
+
+                if (user.canDoForProject(project.id, "UPDATE", "EXPERIMENT"))
+                    modellingButton.toolTip = TOOLTIP_MODELLING_UPDATING;
+                else
+                    modellingButton.toolTip = TOOLTIP_MODELLING_VIEWING;
+            }
+
+            // some fixed tooltips
+            picaButton.toolTip = TOOLTIP_INSTITUTIONAL;
+            visualisationsButton.toolTip = TOOLTIP_VISUALISATIONS;
+            backgroundButton.toolTip = TOOLTIP_HELPTOPICS;
+            experimentQueueingButton.toolTip = TOOLTIP_EXPERIMENT_QUEUEING;
+			calculationsButton.toolTip = TOOLTIP_EXPERIMENT_PROCESSING;
+			
+            switchToDefault();
+        }
+
+
+        public function switchToDefault(): void {
+            var defaultBtn: Button = visualisationsButton;
+
+            if ((getUser() != null) && (getProject() != null)) {
+                defaultBtn = projDefButton;
+            }
+
+            defaultBtn.dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+        }
+
+
+        private function getUser():User {
+            return Application.application.activeUser;
+        }
+
+
+        private function getProject():Project {
+            return Application.application.activeProject;
+        }
+
+
+        private function changeSelection(event:Event):void {
+            if (event.target is RadioButtonGroup) {
+                if ((event.target as RadioButtonGroup).selection == modellingButton)
+                    currentState = "modelingSubMenu";
+                else
+                    currentState = "";
+            }
+        }
+
+
+        private function updateGuideLines():void {
+            hruleGoals.visible = (activeTask == TASK_PROJECT);
+            hruleIndicators.visible = (activeTask == TASK_INDICATOR);
+            hruleInstitutionalAnalysis.visible = (activeTask == TASK_INSTITUTIONAL);
+            hruleNarratives.visible = (activeTask == TASK_NARRATIVE);
+            hruleVisualizations.visible = (activeTask == TASK_VISUALISATION);
+            hruleInformation.visible = (activeTask == TASK_BACKGROUND);
+        }
+			
+		]]>
+	</mx:Script>
+
+
+    <mx:Image x="0" y="0" source="img/images/boog.png"/>
+    <mx:RadioButtonGroup id="mainMenu" change="{changeSelection(event)}"/>
+    <mx:RadioButtonGroup id="subMenu"/>
+    <mx:RadioButton x="11" y="10" width="60" height="60"
+                    id="projDefButton" group="{mainMenu}" styleName="projectDefinition"
+                    icon="{null}" click="{setTask(event, TASK_PROJECT)}"
+                    toolTip="Problem Description"
+                    selected="true"/>
+    <mx:RadioButton x="32" y="86" width="60" height="60"
+                    id="narrativeExpButton" group="{mainMenu}" styleName="experimentNarratives"
+                    icon="{null}" click="{setTask(event, TASK_NARRATIVE)}"
+                    toolTip="Experiment Narratives"/>
+    <mx:RadioButton x="44" y="165" width="60" height="60"
+                    id="indicatorSelectionButton" group="{mainMenu}" styleName="indicators"
+                    icon="{null}" click="{setTask(event, TASK_INDICATOR)}"
+                    toolTip="Indicator Manager"/>
+    <mx:RadioButton x="51" y="243" width="60" height="60"
+                    id="modellingButton" group="{mainMenu}" styleName="modeling"
+                    icon="{null}"
+                    click="{subMenu.selection = experimentDesignerButton; setTask(event, TASK_MODELING_EXPERIMENT)}"
+                    toolTip="modeling"/>
+
+    <!-- Modelling submenu -->
+    <mx:RadioButton x="113" y="231" width="18" height="18"
+                    id="experimentDesignerButton" group="{subMenu}" styleName="submenuModeling"
+                    icon="{null}" click="{setTask(event, TASK_MODELING_EXPERIMENT)}"
+                    toolTip="Experiment Designer"
+                    selected="true" visible="false"/>
+    <mx:RadioButton x="120" y="253" width="18" height="18"
+                    id="experimentQueueingButton" group="{subMenu}" styleName="submenuModeling"
+                    icon="{null}" click="{setTask(event, TASK_MODELING_QUEUEING)}"
+                    toolTip="Experiment Queueing" visible="false"/>
+    <mx:RadioButton x="120" y="276" width="18" height="18"
+                    id="modelChainsButton" group="{subMenu}" styleName="submenuModeling"
+                    icon="{null}" click="{setTask(event, TASK_MODELING_CHAIN)}"
+                    toolTip="Model Chain Viewer" visible="false"/>
+    <mx:RadioButton x="113" y="297" width="18" height="18"
+                    id="calculationsButton" group="{subMenu}" styleName="submenuModeling"
+                    icon="{null}" click="{setTask(event, TASK_MODELING_CALCULATION)}"
+                    toolTip="Processing Center" visible="false"/>
+    <!-- End of modelling submenu -->
+
+    <mx:RadioButton x="44" y="320" width="60" height="60"
+                    id="visualisationsButton" group="{mainMenu}" styleName="visuals"
+                    icon="{null}" click="{setTask(event, TASK_VISUALISATION)}"
+                    toolTip="Visualisations"/>
+    <mx:RadioButton x="32" y="394" width="60" height="60"
+                    id="picaButton" group="{mainMenu}" styleName="institutionalAnalysis"
+                    icon="{null}" click="{setTask(event, TASK_INSTITUTIONAL)}"
+                    toolTip="Institutional Analyses (PICA)"/>
+    <mx:RadioButton x="12" y="476" width="60" height="60"
+                    id="backgroundButton" group="{mainMenu}" styleName="backgroundInformation"
+                    icon="{null}" click="{setTask(event, TASK_BACKGROUND)}"
+                    toolTip="Help Topics" enabled="true"/>
+
+    <mx:HRule x="75" y="38" width="65" strokeColor="#8A3D09" strokeWidth="2" height="2" id="hruleGoals" visible="true"/>
+    <mx:HRule x="96.6" y="114.4" width="43.4" strokeColor="#B668BD" strokeWidth="2" height="2" id="hruleNarratives"
+              visible="true"/>
+    <mx:HRule x="96.6" y="424.4" width="43.4" strokeColor="#657FC1" strokeWidth="2" height="2"
+              id="hruleInstitutionalAnalysis" visible="true"/>
+    <mx:HRule x="107" y="194.4" width="33" strokeColor="#C6BC4F" strokeWidth="2" height="2" id="hruleIndicators"
+              visible="true"/>
+    <mx:HRule x="107" y="349.6" width="33" strokeColor="#E38E8E" strokeWidth="2" height="2" id="hruleVisualizations"
+              visible="true"/>
+    <mx:HRule x="75" y="506" width="65" strokeColor="#A13C8A" strokeWidth="2" height="2" id="hruleInformation"
+              visible="true"/>
+</mx:Canvas>
